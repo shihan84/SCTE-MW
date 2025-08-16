@@ -50,6 +50,17 @@
             const [draggedAd, setDraggedAd] = useState(null);
             const [systemHealth, setSystemHealth] = useState({});
             const [showLogs, setShowLogs] = useState(false);
+            const [activeTab, setActiveTab] = useState('dashboard');
+            const [rtmpServer, setRtmpServer] = useState({
+                status: 'unknown',
+                port: 1935,
+                httpPort: 8000,
+                testPort: 8001,
+                connections: 0,
+                streams: [],
+                logs: [],
+                uptime: 0
+            });
 
             // Refs for hotkey handling
             const hotkeyRef = useRef(null);
@@ -78,15 +89,17 @@
             useEffect(() => {
                 fetchStreams();
                 fetchHealth();
+                fetchRtmpServerStatus();
                 
                 // Set up polling
                 const interval = setInterval(() => {
                     fetchStreams();
                     fetchHealth();
+                    fetchRtmpServerStatus();
                 }, 2000);
 
                 return () => clearInterval(interval);
-            }, [fetchStreams, fetchHealth]);
+            }, [fetchStreams, fetchHealth, fetchRtmpServerStatus]);
 
             // Hotkey handling
             useEffect(() => {
@@ -169,6 +182,12 @@
                 }
             };
 
+            const removeScheduledAd = (index) => {
+                const newScheduledAds = scheduledAds.filter((_, i) => i !== index);
+                setScheduledAds(newScheduledAds);
+                addLog(`Removed scheduled ad at index ${index}`, 'info');
+            };
+
             const startStream = async (streamId) => {
                 try {
                     await axios.post(`${API_BASE}/api/streams/${streamId}/start`, {
@@ -188,6 +207,79 @@
                     fetchStreams();
                 } catch (error) {
                     addLog(`Error stopping stream ${streamId}: ${error.message}`, 'error');
+                }
+            };
+
+            // RTMP Server Control Functions
+            const fetchRtmpServerStatus = useCallback(async () => {
+                try {
+                    const response = await axios.get(`${API_BASE}/api/rtmp/status`);
+                    setRtmpServer(response.data);
+                } catch (error) {
+                    setRtmpServer(prev => ({
+                        ...prev,
+                        status: 'stopped'
+                    }));
+                }
+            }, []);
+
+            const startRtmpServer = async () => {
+                try {
+                    addLog('RTMP server is integrated with main server', 'info');
+                    setRtmpServer(prev => ({
+                        ...prev,
+                        status: 'running'
+                    }));
+                    
+                    const response = await axios.post(`${API_BASE}/api/rtmp/start`);
+                    addLog(response.data.message, 'success');
+                    
+                    // Refresh status immediately
+                    fetchRtmpServerStatus();
+                } catch (error) {
+                    addLog(`Error checking RTMP server: ${error.message}`, 'error');
+                }
+            };
+
+            const stopRtmpServer = async () => {
+                try {
+                    addLog('Cannot stop integrated RTMP server independently', 'warning');
+                    
+                    const response = await axios.post(`${API_BASE}/api/rtmp/stop`);
+                    addLog(response.data.message, 'warning');
+                    
+                    // Refresh status
+                    fetchRtmpServerStatus();
+                } catch (error) {
+                    addLog(`Error checking RTMP server: ${error.message}`, 'error');
+                }
+            };
+
+            const restartRtmpServer = async () => {
+                try {
+                    addLog('Cannot restart integrated RTMP server independently', 'info');
+                    
+                    const response = await axios.post(`${API_BASE}/api/rtmp/restart`);
+                    addLog(response.data.message, 'warning');
+                    
+                    // Refresh status
+                    fetchRtmpServerStatus();
+                } catch (error) {
+                    addLog(`Error checking RTMP server: ${error.message}`, 'error');
+                }
+            };
+
+            const testRtmpConnection = async () => {
+                try {
+                    addLog('Testing RTMP server connection...', 'info');
+                    const response = await axios.post(`${API_BASE}/api/rtmp/test`);
+                    if (response.data.success) {
+                        addLog(response.data.message, 'success');
+                    } else {
+                        addLog(response.data.message, 'error');
+                    }
+                } catch (error) {
+                    addLog(`RTMP server connection test failed: ${error.message}`, 'error');
                 }
             };
 
@@ -258,172 +350,671 @@
                         </div>
                     </header>
 
+                    <nav className="nav-tabs">
+                        <div className="tab-container">
+                            <button 
+                                className={`tab-button ${activeTab === 'dashboard' ? 'active' : ''}`}
+                                onClick={() => setActiveTab('dashboard')}
+                            >
+                                📺 Dashboard
+                            </button>
+                            <button 
+                                className={`tab-button ${activeTab === 'scheduler' ? 'active' : ''}`}
+                                onClick={() => setActiveTab('scheduler')}
+                            >
+                                📅 Scheduler
+                            </button>
+                            <button 
+                                className={`tab-button ${activeTab === 'rtmp' ? 'active' : ''}`}
+                                onClick={() => setActiveTab('rtmp')}
+                            >
+                                📡 RTMP Monitor
+                            </button>
+                            <button 
+                                className={`tab-button ${activeTab === 'settings' ? 'active' : ''}`}
+                                onClick={() => setActiveTab('settings')}
+                            >
+                                ⚙️ Settings
+                            </button>
+                        </div>
+                    </nav>
+
                     <div className="main-content">
-                        <div className="control-panel">
-                            <div className="ad-presets">
-                                <h3>Ad Presets (Drag to Stream)</h3>
-                                <div className="preset-grid">
-                                    {AD_PRESETS.map(preset => (
+                        {activeTab === 'dashboard' && (
+                            <>
+                                <div className="control-panel">
+                                    <div className="ad-presets">
+                                        <h3>Ad Presets (Drag to Stream)</h3>
+                                        <div className="preset-grid">
+                                            {AD_PRESETS.map(preset => (
+                                                <div
+                                                    key={preset.label}
+                                                    className="preset-card"
+                                                    draggable
+                                                    onDragStart={(e) => handleDragStart(e, preset)}
+                                                >
+                                                    <div className="preset-label">{preset.label}</div>
+                                                    {preset.value === 'custom' && (
+                                                        <input
+                                                            type="number"
+                                                            value={customDuration}
+                                                            onChange={(e) => setCustomDuration(parseInt(e.target.value))}
+                                                            min="1"
+                                                            max="3600"
+                                                            className="custom-input"
+                                                        />
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    <div className="bulk-controls">
+                                        <h3>Bulk Controls</h3>
+                                        <div className="bulk-buttons">
+                                            <button 
+                                                className="btn btn-warning"
+                                                onClick={() => handleCueOutAll(30)}
+                                            >
+                                                CUE-OUT ALL (30s)
+                                            </button>
+                                            <button 
+                                                className="btn btn-success"
+                                                onClick={() => handleCueInAll()}
+                                            >
+                                                CUE-IN ALL
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div className="hotkey-help">
+                                        <h3>Hotkeys</h3>
+                                        <div className="hotkey-list">
+                                            <div>F1-F8: Quick CUE-OUT (30s)</div>
+                                            <div>Ctrl+F1-F8: Quick CUE-IN</div>
+                                            <div>Ctrl+Shift+O: Emergency CUE-OUT All</div>
+                                            <div>Ctrl+Shift+I: Emergency CUE-IN All</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="streams-grid">
+                                    {Object.entries(streams).map(([streamId, stream], index) => (
                                         <div
-                                            key={preset.label}
-                                            className="preset-card"
-                                            draggable
-                                            onDragStart={(e) => handleDragStart(e, preset)}
+                                            key={streamId}
+                                            className={`stream-card ${stream.status}`}
+                                            onDragOver={handleDragOver}
+                                            onDrop={(e) => handleDrop(e, streamId)}
                                         >
-                                            <div className="preset-label">{preset.label}</div>
-                                            {preset.value === 'custom' && (
-                                                <input
-                                                    type="number"
-                                                    value={customDuration}
-                                                    onChange={(e) => setCustomDuration(parseInt(e.target.value))}
-                                                    min="1"
-                                                    max="3600"
-                                                    className="custom-input"
-                                                />
+                                            <div className="stream-header">
+                                                <div className="stream-title">
+                                                    <span className="stream-hotkey">F{index + 1}</span>
+                                                    <h3>{stream.name || streamId}</h3>
+                                                </div>
+                                                <div 
+                                                    className="status-indicator"
+                                                    style={{ backgroundColor: STATUS_COLORS[stream.status] || '#666' }}
+                                                ></div>
+                                            </div>
+
+                                            <div className="stream-info">
+                                                <div className="info-row">
+                                                    <span>Status:</span>
+                                                    <span className={`status-text ${stream.status}`}>
+                                                        {stream.status?.toUpperCase()}
+                                                    </span>
+                                                </div>
+                                                <div className="info-row">
+                                                    <span>Bitrate:</span>
+                                                    <span>{stream.health?.bitrate || 0} kbps</span>
+                                                </div>
+                                                <div className="info-row">
+                                                    <span>FPS:</span>
+                                                    <span>{stream.health?.fps || 0}</span>
+                                                </div>
+                                                <div className="info-row">
+                                                    <span>Uptime:</span>
+                                                    <span>{formatUptime(stream.startTime)}</span>
+                                                </div>
+                                                <div className="info-row">
+                                                    <span>Last Event ID:</span>
+                                                    <span>{stream.lastEventId || 'N/A'}</span>
+                                                </div>
+                                            </div>
+
+                                            <div className="stream-controls">
+                                                <div className="control-row">
+                                                    {stream.status === 'running' ? (
+                                                        <button 
+                                                            className="btn btn-danger btn-sm"
+                                                            onClick={() => stopStream(streamId)}
+                                                        >
+                                                            Stop
+                                                        </button>
+                                                    ) : (
+                                                        <button 
+                                                            className="btn btn-success btn-sm"
+                                                            onClick={() => startStream(streamId)}
+                                                        >
+                                                            Start
+                                                        </button>
+                                                    )}
+                                                </div>
+                                                
+                                                {stream.status === 'running' && (
+                                                    <div className="cue-controls">
+                                                        <div className="cue-row">
+                                                            <button 
+                                                                className="btn btn-warning btn-sm"
+                                                                onClick={() => handleCueOut(streamId, 30)}
+                                                            >
+                                                                CUE-OUT 30s
+                                                            </button>
+                                                            <button 
+                                                                className="btn btn-warning btn-sm"
+                                                                onClick={() => handleCueOut(streamId, 60)}
+                                                            >
+                                                                CUE-OUT 60s
+                                                            </button>
+                                                        </div>
+                                                        <div className="cue-row">
+                                                            <button 
+                                                                className="btn btn-success btn-sm"
+                                                                onClick={() => handleCueIn(streamId)}
+                                                            >
+                                                                CUE-IN
+                                                            </button>
+                                                            <button 
+                                                                className="btn btn-warning btn-sm"
+                                                                onClick={() => handleCueOut(streamId, 120)}
+                                                            >
+                                                                CUE-OUT 120s
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            {stream.error && (
+                                                <div className="error-message">
+                                                    Error: {stream.error}
+                                                </div>
                                             )}
+
+                                            <div className="drop-zone">
+                                                Drop ad preset here
+                                            </div>
                                         </div>
                                     ))}
                                 </div>
-                            </div>
+                            </>
+                        )}
 
-                            <div className="bulk-controls">
-                                <h3>Bulk Controls</h3>
-                                <div className="bulk-buttons">
-                                    <button 
-                                        className="btn btn-warning"
-                                        onClick={() => handleCueOutAll(30)}
-                                    >
-                                        CUE-OUT ALL (30s)
-                                    </button>
-                                    <button 
-                                        className="btn btn-success"
-                                        onClick={() => handleCueInAll()}
-                                    >
-                                        CUE-IN ALL
-                                    </button>
-                                </div>
-                            </div>
-
-                            <div className="hotkey-help">
-                                <h3>Hotkeys</h3>
-                                <div className="hotkey-list">
-                                    <div>F1-F8: Quick CUE-OUT (30s)</div>
-                                    <div>Ctrl+F1-F8: Quick CUE-IN</div>
-                                    <div>Ctrl+Shift+O: Emergency CUE-OUT All</div>
-                                    <div>Ctrl+Shift+I: Emergency CUE-IN All</div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="streams-grid">
-                            {Object.entries(streams).map(([streamId, stream], index) => (
-                                <div
-                                    key={streamId}
-                                    className={`stream-card ${stream.status}`}
-                                    onDragOver={handleDragOver}
-                                    onDrop={(e) => handleDrop(e, streamId)}
-                                >
-                                    <div className="stream-header">
-                                        <div className="stream-title">
-                                            <span className="stream-hotkey">F{index + 1}</span>
-                                            <h3>{stream.name || streamId}</h3>
-                                        </div>
-                                        <div 
-                                            className="status-indicator"
-                                            style={{ backgroundColor: STATUS_COLORS[stream.status] || '#666' }}
-                                        ></div>
-                                    </div>
-
-                                    <div className="stream-info">
-                                        <div className="info-row">
-                                            <span>Status:</span>
-                                            <span className={`status-text ${stream.status}`}>
-                                                {stream.status?.toUpperCase()}
-                                            </span>
-                                        </div>
-                                        <div className="info-row">
-                                            <span>Bitrate:</span>
-                                            <span>{stream.health?.bitrate || 0} kbps</span>
-                                        </div>
-                                        <div className="info-row">
-                                            <span>FPS:</span>
-                                            <span>{stream.health?.fps || 0}</span>
-                                        </div>
-                                        <div className="info-row">
-                                            <span>Uptime:</span>
-                                            <span>{formatUptime(stream.startTime)}</span>
-                                        </div>
-                                        <div className="info-row">
-                                            <span>Last Event ID:</span>
-                                            <span>{stream.lastEventId || 'N/A'}</span>
-                                        </div>
-                                    </div>
-
-                                    <div className="stream-controls">
-                                        <div className="control-row">
-                                            {stream.status === 'running' ? (
-                                                <button 
-                                                    className="btn btn-danger btn-sm"
-                                                    onClick={() => stopStream(streamId)}
+                        {activeTab === 'scheduler' && (
+                            <div className="tab-content">
+                                <div className="scheduler-container">
+                                    <h2>📅 SCTE-35 Scheduler</h2>
+                                    <p>Advanced scheduling and PID/Event ID management</p>
+                                    
+                                    {/* Quick SCTE-35 Controls */}
+                                    <div className="quick-controls">
+                                        <h3>Quick Controls</h3>
+                                        <div className="control-grid">
+                                            <div className="control-group">
+                                                <label>Stream:</label>
+                                                <select 
+                                                    value={selectedStream || ''} 
+                                                    onChange={(e) => setSelectedStream(e.target.value)}
                                                 >
-                                                    Stop
-                                                </button>
+                                                    <option value="">Select Stream</option>
+                                                    {Object.keys(streams).map(streamId => (
+                                                        <option key={streamId} value={streamId}>
+                                                            {streams[streamId].name || streamId}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                            <div className="control-group">
+                                                <label>Duration (seconds):</label>
+                                                <input 
+                                                    type="number" 
+                                                    value={customDuration} 
+                                                    onChange={(e) => setCustomDuration(parseInt(e.target.value) || 30)}
+                                                    min="1" 
+                                                    max="3600"
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="action-buttons">
+                                            <button 
+                                                className="btn btn-warning"
+                                                onClick={() => handleCueOut(selectedStream, customDuration)}
+                                                disabled={!selectedStream}
+                                            >
+                                                🎬 CUE-OUT ({customDuration}s)
+                                            </button>
+                                            <button 
+                                                className="btn btn-success"
+                                                onClick={() => handleCueIn(selectedStream)}
+                                                disabled={!selectedStream}
+                                            >
+                                                ▶️ CUE-IN
+                                            </button>
+                                            <button 
+                                                className="btn btn-info"
+                                                onClick={() => handleCueOutAll(customDuration)}
+                                            >
+                                                🎬 CUE-OUT ALL ({customDuration}s)
+                                            </button>
+                                            <button 
+                                                className="btn btn-primary"
+                                                onClick={() => handleCueInAll()}
+                                            >
+                                                ▶️ CUE-IN ALL
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {/* Scheduled Events */}
+                                    <div className="scheduled-events">
+                                        <h3>Scheduled Events</h3>
+                                        <div className="event-list">
+                                            {scheduledAds.length === 0 ? (
+                                                <p>No scheduled events</p>
                                             ) : (
-                                                <button 
-                                                    className="btn btn-success btn-sm"
-                                                    onClick={() => startStream(streamId)}
-                                                >
-                                                    Start
-                                                </button>
+                                                scheduledAds.map((ad, index) => (
+                                                    <div key={index} className="event-item">
+                                                        <span className="event-time">{ad.time}</span>
+                                                        <span className="event-stream">{ad.stream}</span>
+                                                        <span className="event-duration">{ad.duration}s</span>
+                                                        <button 
+                                                            className="btn btn-sm btn-danger"
+                                                            onClick={() => removeScheduledAd(index)}
+                                                        >
+                                                            ❌
+                                                        </button>
+                                                    </div>
+                                                ))
                                             )}
                                         </div>
-                                        
-                                        {stream.status === 'running' && (
-                                            <div className="cue-controls">
-                                                <div className="cue-row">
-                                                    <button 
-                                                        className="btn btn-warning btn-sm"
-                                                        onClick={() => handleCueOut(streamId, 30)}
-                                                    >
-                                                        CUE-OUT 30s
-                                                    </button>
-                                                    <button 
-                                                        className="btn btn-warning btn-sm"
-                                                        onClick={() => handleCueOut(streamId, 60)}
-                                                    >
-                                                        CUE-OUT 60s
-                                                    </button>
-                                                </div>
-                                                <div className="cue-row">
-                                                    <button 
-                                                        className="btn btn-success btn-sm"
-                                                        onClick={() => handleCueIn(streamId)}
-                                                    >
-                                                        CUE-IN
-                                                    </button>
-                                                    <button 
-                                                        className="btn btn-warning btn-sm"
-                                                        onClick={() => handleCueOut(streamId, 120)}
-                                                    >
-                                                        CUE-OUT 120s
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        )}
                                     </div>
 
-                                    {stream.error && (
-                                        <div className="error-message">
-                                            Error: {stream.error}
+                                    {/* Advanced Scheduler */}
+                                    <div className="advanced-scheduler">
+                                        <h3>Advanced Scheduler</h3>
+                                        <div className="scheduler-actions">
+                                            <button 
+                                                className="btn btn-primary"
+                                                onClick={() => window.open('scheduler.html', '_blank')}
+                                            >
+                                                Open Advanced Scheduler
+                                            </button>
+                                            <button 
+                                                className="btn btn-secondary"
+                                                onClick={() => window.open('scheduler.html', '_self')}
+                                            >
+                                                Replace Current Page
+                                            </button>
                                         </div>
-                                    )}
-
-                                    <div className="drop-zone">
-                                        Drop ad preset here
+                                        <div className="scheduler-info">
+                                            <h4>Features:</h4>
+                                            <ul>
+                                                <li>Time-based ad scheduling</li>
+                                                <li>Custom PID configuration</li>
+                                                <li>Event ID management</li>
+                                                <li>Recurring schedules</li>
+                                                <li>Manual override controls</li>
+                                            </ul>
+                                        </div>
                                     </div>
                                 </div>
-                            ))}
-                        </div>
+                            </div>
+                        )}
+
+                        {activeTab === 'rtmp' && (
+                            <div className="tab-content">
+                                <div className="rtmp-container">
+                                    <h2>📡 RTMP Server Control</h2>
+                                    <p>Manage the standalone RTMP server and monitor connections</p>
+                                    
+                                    {/* RTMP Server Status */}
+                                    <div className="rtmp-status-section">
+                                        <h3>Server Status</h3>
+                                        <div className="status-grid">
+                                            <div className="status-item">
+                                                <span className="label">Status:</span>
+                                                <span className={`value status-${rtmpServer.status}`}>
+                                                    {rtmpServer.status === 'running' && '🟢 Running'}
+                                                    {rtmpServer.status === 'stopped' && '🔴 Stopped'}
+                                                    {rtmpServer.status === 'starting' && '🟡 Starting'}
+                                                    {rtmpServer.status === 'stopping' && '🟡 Stopping'}
+                                                    {rtmpServer.status === 'unknown' && '⚪ Unknown'}
+                                                </span>
+                                            </div>
+                                            <div className="status-item">
+                                                <span className="label">RTMP Port:</span>
+                                                <span className="value">{rtmpServer.port}</span>
+                                            </div>
+                                            <div className="status-item">
+                                                <span className="label">HTTP Port:</span>
+                                                <span className="value">{rtmpServer.httpPort}</span>
+                                            </div>
+                                            <div className="status-item">
+                                                <span className="label">Test Port:</span>
+                                                <span className="value">{rtmpServer.testPort}</span>
+                                            </div>
+                                            <div className="status-item">
+                                                <span className="label">Connections:</span>
+                                                <span className="value">{rtmpServer.connections}</span>
+                                            </div>
+                                            <div className="status-item">
+                                                <span className="label">Active Streams:</span>
+                                                <span className="value">{rtmpServer.streams.length}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* RTMP Server Controls */}
+                                    <div className="rtmp-controls-section">
+                                        <h3>Server Controls (Integrated)</h3>
+                                        <div className="control-buttons">
+                                            <button 
+                                                className={`btn ${rtmpServer.status === 'running' ? 'btn-success' : 'btn-primary'}`}
+                                                onClick={startRtmpServer}
+                                                disabled={rtmpServer.status === 'running'}
+                                            >
+                                                {rtmpServer.status === 'running' ? '✅ Running (Integrated)' : '▶️ Check Status'}
+                                            </button>
+                                            <button 
+                                                className="btn btn-secondary"
+                                                onClick={testRtmpConnection}
+                                            >
+                                                🧪 Test Connection
+                                            </button>
+                                        </div>
+                                        <p style={{marginTop: '10px', fontSize: '14px', color: '#888'}}>
+                                            ℹ️ RTMP server is integrated with the main SCTE-35 middleware server
+                                        </p>
+                                    </div>
+
+                                    {/* Active Streams Display */}
+                                    <div className="active-streams-section">
+                                        <h3>Active Streams</h3>
+                                        <div className="streams-grid">
+                                            {Object.keys(streams).length === 0 ? (
+                                                <p>No streams configured</p>
+                                            ) : (
+                                                Object.keys(streams).map(streamId => {
+                                                    const stream = streams[streamId];
+                                                    return (
+                                                        <div key={streamId} className={`stream-card ${stream.status}`}>
+                                                            <div className="stream-header">
+                                                                <h4>{stream.name || streamId}</h4>
+                                                                <span className={`status-badge ${stream.status}`}>
+                                                                    {stream.status === 'running' && '🟢 Active'}
+                                                                    {stream.status === 'stopped' && '🔴 Stopped'}
+                                                                    {stream.status === 'connecting' && '🟡 Connecting'}
+                                                                    {stream.status === 'error' && '🔴 Error'}
+                                                                </span>
+                                                            </div>
+                                                            <div className="stream-details">
+                                                                <div className="detail-item">
+                                                                    <span className="label">RTMP URL:</span>
+                                                                    <span className="value">{stream.rtmpUrl}</span>
+                                                                </div>
+                                                                <div className="detail-item">
+                                                                    <span className="label">HLS URL:</span>
+                                                                    <span className="value">{stream.hlsUrl}</span>
+                                                                </div>
+                                                                <div className="detail-item">
+                                                                    <span className="label">Bitrate:</span>
+                                                                    <span className="value">{stream.health?.bitrate || 0} kbps</span>
+                                                                </div>
+                                                                <div className="detail-item">
+                                                                    <span className="label">FPS:</span>
+                                                                    <span className="value">{stream.health?.fps || 0}</span>
+                                                                </div>
+                                                            </div>
+                                                            <div className="stream-actions">
+                                                                                                                                 <button 
+                                                                     className="btn btn-sm btn-success"
+                                                                     onClick={() => window.open(`hls-player.html?stream=${streamId}&url=${encodeURIComponent(stream.hlsUrl)}`, '_blank')}
+                                                                     disabled={stream.status !== 'running'}
+                                                                 >
+                                                                     📺 Play HLS
+                                                                 </button>
+                                                                <button 
+                                                                    className="btn btn-sm btn-info"
+                                                                    onClick={() => window.open(stream.dashUrl, '_blank')}
+                                                                    disabled={stream.status !== 'running'}
+                                                                >
+                                                                    📊 Play DASH
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* OBS Configuration Guide */}
+                                    <div className="obs-config-section">
+                                        <h3>OBS Studio Configuration</h3>
+                                        <div className="config-grid">
+                                            <div className="config-item">
+                                                <span className="label">Service:</span>
+                                                <span className="value">Custom</span>
+                                            </div>
+                                            <div className="config-item">
+                                                <span className="label">Server:</span>
+                                                <span className="value">rtmp://localhost:1935/live</span>
+                                            </div>
+                                            <div className="config-item">
+                                                <span className="label">Stream Key:</span>
+                                                <span className="value">stream1 (or any name)</span>
+                                            </div>
+                                        </div>
+                                        <div className="config-actions">
+                                            <button 
+                                                className="btn btn-info"
+                                                onClick={() => {
+                                                    navigator.clipboard.writeText('rtmp://localhost:1935/live');
+                                                    addLog('RTMP URL copied to clipboard', 'success');
+                                                }}
+                                            >
+                                                📋 Copy RTMP URL
+                                            </button>
+                                            <button 
+                                                className="btn btn-info"
+                                                onClick={() => {
+                                                    navigator.clipboard.writeText('stream1');
+                                                    addLog('Stream key copied to clipboard', 'success');
+                                                }}
+                                            >
+                                                📋 Copy Stream Key
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {/* Quick Links */}
+                                    <div className="quick-links-section">
+                                        <h3>Quick Access</h3>
+                                        <div className="link-buttons">
+                                            <button 
+                                                className="btn btn-secondary"
+                                                onClick={() => window.open('http://localhost:8001', '_blank')}
+                                            >
+                                                🌐 Test Server (Port 8001)
+                                            </button>
+                                            <button 
+                                                className="btn btn-secondary"
+                                                onClick={() => window.open('http://localhost:8000/live/stream1/index.m3u8', '_blank')}
+                                            >
+                                                📺 HLS Stream (Port 8000)
+                                            </button>
+                                            <button 
+                                                className="btn btn-secondary"
+                                                onClick={() => window.open('rtmp-dashboard.html', '_blank')}
+                                            >
+                                                📊 RTMP Dashboard
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {/* Server Information */}
+                                    <div className="server-info-section">
+                                        <h3>Server Information</h3>
+                                        <div className="info-list">
+                                            <div className="info-item">
+                                                <strong>RTMP Endpoint:</strong> rtmp://localhost:1935/live/{'{streamKey}'}
+                                            </div>
+                                            <div className="info-item">
+                                                <strong>HLS Endpoint:</strong> http://localhost:8000/live/{'{streamKey}'}/index.m3u8
+                                            </div>
+                                            <div className="info-item">
+                                                <strong>DASH Endpoint:</strong> http://localhost:8000/live/{'{streamKey}'}/index.mpd
+                                            </div>
+                                            <div className="info-item">
+                                                <strong>Health Check:</strong> http://localhost:8001
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {activeTab === 'settings' && (
+                            <div className="tab-content">
+                                <div className="settings-container">
+                                    <h2>⚙️ System Settings</h2>
+                                    <p>Configuration and system management</p>
+                                    
+                                    <div className="settings-section">
+                                        <h3>System Information</h3>
+                                        <div className="info-grid">
+                                            <div className="info-item">
+                                                <span className="label">API Port:</span>
+                                                <span className="value">{systemHealth.config?.apiPort || 3000}</span>
+                                            </div>
+                                            <div className="info-item">
+                                                <span className="label">RTMP Port:</span>
+                                                <span className="value">{systemHealth.config?.rtmpPort || 1935}</span>
+                                            </div>
+                                            <div className="info-item">
+                                                <span className="label">SCTE-35 PID:</span>
+                                                <span className="value">{systemHealth.config?.scte35Pid || 500}</span>
+                                            </div>
+                                            <div className="info-item">
+                                                <span className="label">Base Event ID:</span>
+                                                <span className="value">{systemHealth.config?.baseEventId || 100023}</span>
+                                            </div>
+                                            <div className="info-item">
+                                                <span className="label">Flussonic Host:</span>
+                                                <span className="value">{systemHealth.config?.flussonicHost || 'localhost'}</span>
+                                            </div>
+                                            <div className="info-item">
+                                                <span className="label">Flussonic Port:</span>
+                                                <span className="value">{systemHealth.config?.flussonicPort || 1234}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="settings-section">
+                                        <h3>Quick Actions</h3>
+                                        <div className="action-buttons">
+                                            <button 
+                                                className="btn btn-primary"
+                                                onClick={() => addLog('Restart server requested', 'info')}
+                                            >
+                                                Restart Server
+                                            </button>
+                                            <button 
+                                                className="btn btn-warning"
+                                                onClick={() => {
+                                                    setLogs([]);
+                                                    addLog('Logs cleared', 'info');
+                                                }}
+                                            >
+                                                Clear Logs
+                                            </button>
+                                            <button 
+                                                className="btn btn-secondary"
+                                                onClick={() => {
+                                                    const config = JSON.stringify(systemHealth.config, null, 2);
+                                                    const blob = new Blob([config], { type: 'application/json' });
+                                                    const url = URL.createObjectURL(blob);
+                                                    const a = document.createElement('a');
+                                                    a.href = url;
+                                                    a.download = 'scte35-config.json';
+                                                    a.click();
+                                                    URL.revokeObjectURL(url);
+                                                    addLog('Configuration exported', 'success');
+                                                }}
+                                            >
+                                                Export Config
+                                            </button>
+                                            <button 
+                                                className="btn btn-secondary"
+                                                onClick={() => addLog('Import config feature coming soon', 'info')}
+                                            >
+                                                Import Config
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div className="settings-section">
+                                        <h3>Documentation</h3>
+                                        <div className="doc-links">
+                                            <a 
+                                                href="#" 
+                                                className="doc-link"
+                                                onClick={(e) => {
+                                                    e.preventDefault();
+                                                    addLog('Installation guide opened', 'info');
+                                                    window.open('INSTALLATION.md', '_blank');
+                                                }}
+                                            >
+                                                Installation Guide
+                                            </a>
+                                            <a 
+                                                href="#" 
+                                                className="doc-link"
+                                                onClick={(e) => {
+                                                    e.preventDefault();
+                                                    addLog('OBS setup guide opened', 'info');
+                                                    window.open('OBS-SETUP-GUIDE.md', '_blank');
+                                                }}
+                                            >
+                                                OBS Setup Guide
+                                            </a>
+                                            <a 
+                                                href="#" 
+                                                className="doc-link"
+                                                onClick={(e) => {
+                                                    e.preventDefault();
+                                                    addLog('API reference opened', 'info');
+                                                    window.open('README.md#api-reference', '_blank');
+                                                }}
+                                            >
+                                                API Reference
+                                            </a>
+                                            <a 
+                                                href="#" 
+                                                className="doc-link"
+                                                onClick={(e) => {
+                                                    e.preventDefault();
+                                                    addLog('Troubleshooting guide opened', 'info');
+                                                    window.open('ERROR-FIX-SOLUTION.md', '_blank');
+                                                }}
+                                            >
+                                                Troubleshooting
+                                            </a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     {showLogs && (

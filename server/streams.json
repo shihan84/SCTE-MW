@@ -1,246 +1,156 @@
 {
   "stream1": {
     "name": "Main Channel",
-    "lastEventId": 100023,
+    "lastEventId": 100024,
     "autoRestart": true,
     "flussonicOutput": "main_channel",
     "description": "Primary broadcast stream",
-    "ffmpegProcess": {
-      "_events": {},
-      "_eventsCount": 2,
-      "_closesNeeded": 3,
-      "_closesGot": 0,
-      "connected": false,
-      "signalCode": null,
-      "exitCode": null,
-      "killed": false,
-      "spawnfile": "ffmpeg",
-      "_handle": {
-        "pid": 23716
-      },
-      "spawnargs": [
-        "ffmpeg",
-        "-i",
-        "rtmp://localhost:1935/live/stream1",
-        "-c:v",
-        "copy",
-        "-c:a",
-        "copy",
-        "-f",
-        "mpegts",
-        "-pes_data",
-        "500",
-        "-metadata",
-        "service_name=stream1",
-        "-metadata",
-        "service_provider=SCTE35-MW",
-        "-mpegts_pmt_start_pid",
-        "256",
-        "-mpegts_start_pid",
-        "257",
-        "-srt_streamid",
-        "stream1",
-        "srt://localhost:1234?streamid=stream1&pkt_size=1316"
-      ],
-      "pid": 23716,
-      "stdin": {
-        "connecting": false,
-        "_hadError": false,
-        "_parent": null,
-        "_host": null,
-        "_closeAfterHandlingError": false,
-        "_events": {},
-        "_readableState": {
-          "highWaterMark": 16384,
-          "buffer": [],
-          "bufferIndex": 0,
-          "length": 0,
-          "pipes": [],
-          "awaitDrainWriters": null,
-          "readable": false
-        },
-        "_writableState": {
-          "highWaterMark": 16384,
-          "length": 0,
-          "corked": 0,
-          "writelen": 0,
-          "bufferedIndex": 0,
-          "pendingcb": 0
-        },
-        "allowHalfOpen": false,
-        "_eventsCount": 1,
-        "_sockname": null,
-        "_pendingData": null,
-        "_pendingEncoding": "",
-        "server": null,
-        "_server": null
-      },
-      "stdout": {
-        "connecting": false,
-        "_hadError": false,
-        "_parent": null,
-        "_host": null,
-        "_closeAfterHandlingError": false,
-        "_events": {},
-        "_readableState": {
-          "highWaterMark": 16384,
-          "buffer": [],
-          "bufferIndex": 0,
-          "length": 0,
-          "pipes": [],
-          "awaitDrainWriters": null
-        },
-        "_writableState": {
-          "highWaterMark": 16384,
-          "length": 0,
-          "corked": 0,
-          "writelen": 0,
-          "bufferedIndex": 0,
-          "pendingcb": 0
-        },
-        "allowHalfOpen": false,
-        "_eventsCount": 3,
-        "_sockname": null,
-        "_pendingData": null,
-        "_pendingEncoding": "",
-        "server": null,
-        "_server": null
-      },
-      "stderr": {
-        "connecting": false,
-        "_hadError": false,
-        "_parent": null,
-        "_host": null,
-        "_closeAfterHandlingError": false,
-        "_events": {},
-        "_readableState": {
-          "highWaterMark": 16384,
-          "buffer": [],
-          "bufferIndex": 0,
-          "length": 0,
-          "pipes": [],
-          "awaitDrainWriters": null
-        },
-        "_writableState": {
-          "highWaterMark": 16384,
-          "length": 0,
-          "corked": 0,
-          "writelen": 0,
-          "bufferedIndex": 0,
-          "pendingcb": 0
-        },
-        "allowHalfOpen": false,
-        "_eventsCount": 3,
-        "_sockname": null,
-        "_pendingData": null,
-        "_pendingEncoding": "",
-        "server": null,
-        "_server": null
-      },
-      "stdio": [
-        {
-          "connecting": false,
-          "_hadError": false,
-          "_parent": null,
-          "_host": null,
-          "_closeAfterHandlingError": false,
-          "_events": {},
-          "_readableState": {
-            "highWaterMark": 16384,
-            "buffer": [],
-            "bufferIndex": 0,
-            "length": 0,
-            "pipes": [],
-            "awaitDrainWriters": null,
-            "readable": false
-          },
-          "_writableState": {
-            "highWaterMark": 16384,
-            "length": 0,
-            "corked": 0,
-            "writelen": 0,
-            "bufferedIndex": 0,
-            "pendingcb": 0
-          },
-          "allowHalfOpen": false,
-          "_eventsCount": 1,
-          "_sockname": null,
-          "_pendingData": null,
-          "_pendingEncoding": "",
-          "server": null,
-          "_server": null
-        },
-        {
-          "connecting": false,
-          "_hadError": false,
-          "_parent": null,
-          "_host": null,
-          "_closeAfterHandlingError": false,
-          "_events": {},
-          "_readableState": {
-            "highWaterMark": 16384,
-            "buffer": [],
-            "bufferIndex": 0,
-            "length": 0,
-            "pipes": [],
-            "awaitDrainWriters": null
-          },
-          "_writableState": {
-            "highWaterMark": 16384,
-            "length": 0,
-            "corked": 0,
-            "writelen": 0,
-            "bufferedIndex": 0,
-            "pendingcb": 0
-          },
-          "allowHalfOpen": false,
-          "_eventsCount": 3,
-          "_sockname": null,
-          "_pendingData": null,
-          "_pendingEncoding": "",
-          "server": null,
-          "_server": null
-        },
-        {
-          "connecting": false,
-          "_hadError": false,
-          "_parent": null,
-          "_host": null,
-          "_closeAfterHandlingError": false,
-          "_events": {},
-          "_readableState": {
-            "highWaterMark": 16384,
-            "buffer": [],
-            "bufferIndex": 0,
-            "length": 0,
-            "pipes": [],
-            "awaitDrainWriters": null
-          },
-          "_writableState": {
-            "highWaterMark": 16384,
-            "length": 0,
-            "corked": 0,
-            "writelen": 0,
-            "bufferedIndex": 0,
-            "pendingcb": 0
-          },
-          "allowHalfOpen": false,
-          "_eventsCount": 3,
-          "_sockname": null,
-          "_pendingData": null,
-          "_pendingEncoding": "",
-          "server": null,
-          "_server": null
-        }
-      ]
-    },
     "status": "running",
     "health": {
       "bitrate": 0,
-      "fps": 0,
-      "lastUpdate": 1752656776883
+      "fps": 33,
+      "lastUpdate": 1755355467085,
+      "resolution": "1280x720"
     },
-    "startTime": 1752665132545
+    "scte35Log": [
+      {
+        "timestamp": "2025-08-16T12:54:00.847Z",
+        "streamId": "stream1",
+        "command": "CUE-OUT",
+        "eventId": 100024,
+        "duration": 60,
+        "pid": 500
+      },
+      {
+        "timestamp": "2025-08-16T12:54:02.904Z",
+        "streamId": "stream1",
+        "command": "CUE-IN",
+        "eventId": 100025,
+        "duration": null,
+        "pid": 500
+      },
+      {
+        "timestamp": "2025-08-16T12:54:04.058Z",
+        "streamId": "stream1",
+        "command": "CUE-IN",
+        "eventId": 100026,
+        "duration": null,
+        "pid": 500
+      },
+      {
+        "timestamp": "2025-08-16T12:54:26.730Z",
+        "streamId": "stream1",
+        "command": "CUE-IN",
+        "eventId": 100027,
+        "duration": null,
+        "pid": 500
+      },
+      {
+        "timestamp": "2025-08-16T12:54:40.445Z",
+        "streamId": "stream1",
+        "command": "CUE-OUT",
+        "eventId": 100028,
+        "duration": 30,
+        "pid": 500
+      },
+      {
+        "timestamp": "2025-08-16T12:56:00.021Z",
+        "streamId": "stream1",
+        "command": "CUE-OUT",
+        "eventId": 100029,
+        "duration": 30,
+        "pid": 500
+      },
+      {
+        "timestamp": "2025-08-16T13:21:17.064Z",
+        "streamId": "stream1",
+        "command": "CUE-OUT",
+        "eventId": 100024,
+        "duration": 30,
+        "pid": 500
+      },
+      {
+        "timestamp": "2025-08-16T13:21:25.976Z",
+        "streamId": "stream1",
+        "command": "CUE-IN",
+        "eventId": 100025,
+        "duration": null,
+        "pid": 500
+      },
+      {
+        "timestamp": "2025-08-16T13:33:00.260Z",
+        "streamId": "stream1",
+        "command": "CUE-OUT",
+        "eventId": 100026,
+        "duration": 30,
+        "pid": 500
+      },
+      {
+        "timestamp": "2025-08-16T13:36:43.716Z",
+        "streamId": "stream1",
+        "command": "CUE-OUT",
+        "eventId": 100027,
+        "duration": 30,
+        "pid": 500
+      },
+      {
+        "timestamp": "2025-08-16T13:37:12.804Z",
+        "streamId": "stream1",
+        "command": "CUE-IN",
+        "eventId": 100028,
+        "duration": null,
+        "pid": 500
+      },
+      {
+        "timestamp": "2025-08-16T13:38:18.905Z",
+        "streamId": "stream1",
+        "command": "CUE-OUT",
+        "eventId": 100024,
+        "duration": 30,
+        "pid": 500
+      },
+      {
+        "timestamp": "2025-08-16T13:54:45.830Z",
+        "streamId": "stream1",
+        "command": "CUE-OUT",
+        "eventId": 100024,
+        "duration": 30,
+        "pid": 500
+      },
+      {
+        "timestamp": "2025-08-16T13:56:00.247Z",
+        "streamId": "stream1",
+        "command": "CUE-OUT",
+        "eventId": 100025,
+        "duration": 30,
+        "pid": 500
+      },
+      {
+        "timestamp": "2025-08-16T13:56:00.254Z",
+        "streamId": "stream1",
+        "command": "CUE-OUT",
+        "eventId": 100026,
+        "duration": 30,
+        "pid": 500
+      },
+      {
+        "timestamp": "2025-08-16T14:05:01.406Z",
+        "streamId": "stream1",
+        "command": "CUE-OUT",
+        "eventId": 100024,
+        "duration": 30,
+        "pid": 500
+      },
+      {
+        "timestamp": "2025-08-16T14:44:26.795Z",
+        "streamId": "stream1",
+        "command": "CUE-OUT",
+        "eventId": 100024,
+        "duration": 30,
+        "pid": 500,
+        "threefiveEnabled": true
+      }
+    ]
   },
   "stream2": {
     "name": "Secondary Channel",
@@ -248,13 +158,13 @@
     "autoRestart": true,
     "flussonicOutput": "secondary_channel",
     "description": "Backup broadcast stream",
-    "ffmpegProcess": null,
     "status": "stopped",
     "health": {
       "bitrate": 0,
       "fps": 0,
-      "lastUpdate": 1752656776883
-    }
+      "lastUpdate": 1755355379181
+    },
+    "scte35Log": []
   },
   "stream3": {
     "name": "News Channel",
@@ -262,13 +172,13 @@
     "autoRestart": true,
     "flussonicOutput": "news_channel",
     "description": "News broadcast stream",
-    "ffmpegProcess": null,
     "status": "stopped",
     "health": {
       "bitrate": 0,
       "fps": 0,
-      "lastUpdate": 1752656776883
-    }
+      "lastUpdate": 1755355379181
+    },
+    "scte35Log": []
   },
   "stream4": {
     "name": "Sports Channel",
@@ -276,12 +186,12 @@
     "autoRestart": true,
     "flussonicOutput": "sports_channel",
     "description": "Sports broadcast stream",
-    "ffmpegProcess": null,
     "status": "stopped",
     "health": {
       "bitrate": 0,
       "fps": 0,
-      "lastUpdate": 1752656776883
-    }
+      "lastUpdate": 1755355379181
+    },
+    "scte35Log": []
   }
 }

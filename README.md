@@ -1,278 +1,300 @@
-# SCTE-35 Broadcast Middleware
+# 🎥 SCTE-35 Broadcast Middleware
 
-**Windows-Based SCTE-35 Management System for Multi-OBS to Flussonic Streaming**
-
-A professional-grade, portable Windows solution for injecting SCTE-35 markers into multiple OBS streams with broadcast-quality control interface.
-
-## 🎯 Features
-
-- **Multi-Stream Support**: Handle 1-8 concurrent OBS streams
-- **SCTE-35 Compliance**: JioTV/TataSky compatible (PID 500, sequential Event IDs)
-- **Broadcast UI**: Professional dark-themed web interface
-- **Drag & Drop**: Intuitive ad scheduling with preset templates
-- **Hotkey Support**: F1-F8 for quick cue operations
-- **Crash Recovery**: Auto-restart with emergency CUE-IN
-- **Real-time Monitoring**: Stream health indicators and logging
-- **Zero Dependencies**: Portable solution requiring no admin rights
-
-## 📋 System Requirements
-
-- **OS**: Windows 10/11 (No admin rights required)
-- **Node.js**: v14.0.0 or higher
-- **FFmpeg**: Latest stable version
-- **OBS Studio**: v28.0 or higher
-- **RAM**: 4GB minimum, 8GB recommended
-- **Network**: Stable internet connection for streaming
+A comprehensive Windows-based SCTE-35 middleware solution for multi-OBS to Flussonic streaming with integrated RTMP server controls.
 
 ## 🚀 Quick Start
 
-### 1. Download & Extract
+### **Single Command Launch**
 ```bash
-# Extract the scte35-mw folder to your desired location
-# Example: D:\broadcast-tools\scte35-mw\
+# Run the complete system launcher
+launch-scte35.bat
 ```
 
-### 2. Install Dependencies
+This single script will:
+- ✅ Check system requirements (Node.js, FFmpeg)
+- ✅ Verify port availability
+- ✅ Install dependencies
+- ✅ Start SCTE-35 Middleware server
+- ✅ Start standalone RTMP server
+- ✅ Test all services
+- ✅ Provide interactive menu for management
+
+## 📁 Project Structure
+
+```
+SCTE-MW/
+├── launch-scte35.bat          # 🎯 Single launcher for everything
+├── server/
+│   ├── server.js              # Main SCTE-35 middleware server
+│   ├── standalone-rtmp-server.js  # Standalone RTMP server
+│   ├── package.json           # Dependencies
+│   └── streams.json           # Stream configurations
+├── ui/
+│   ├── index.html             # Main dashboard with RTMP controls
+│   ├── styles.css             # Dashboard styling
+│   ├── scheduler.html         # Advanced scheduler
+│   └── rtmp-dashboard.html    # RTMP monitoring
+├── start.bat                  # Legacy launcher (deprecated)
+├── start-rtmp-server.bat      # RTMP server only
+├── test-rtmp-connection.bat   # RTMP connection tester
+└── README.md                  # This file
+```
+
+## 🎯 Features
+
+### **SCTE-35 Middleware**
+- **Real-time SCTE-35 Injection**: CUE-OUT/IN markers with custom durations
+- **Multi-Stream Support**: Handle multiple OBS streams simultaneously
+- **Web Dashboard**: Professional interface with navigation tabs
+- **Hotkey Support**: F1-F8 for quick CUE-OUT, Ctrl+F1-F8 for CUE-IN
+- **Emergency Controls**: Bulk operations for all streams
+- **Health Monitoring**: Real-time stream metrics and status
+
+### **RTMP Server Controls**
+- **Standalone RTMP Server**: Dedicated server for OBS connections
+- **Dashboard Integration**: Full RTMP management from web interface
+- **Real-time Status**: Live monitoring of RTMP server state
+- **OBS Configuration**: Built-in setup guide with copy-to-clipboard
+- **Multiple Protocols**: RTMP, HLS, and DASH support
+- **Connection Testing**: Built-in diagnostic tools
+
+### **Advanced Features**
+- **Navigation Tabs**: Dashboard, Scheduler, RTMP Monitor, Settings
+- **Drag & Drop**: Ad preset management
+- **Auto-restart**: Automatic recovery on stream failures
+- **Configuration Management**: Save/load stream settings
+- **Comprehensive Logging**: Detailed operation logs
+
+## 🔧 System Requirements
+
+### **Required Software**
+- **Node.js** (v14 or higher) - [Download](https://nodejs.org/)
+- **FFmpeg** - [Download](https://ffmpeg.org/)
+
+### **Port Requirements**
+- **Port 3000**: SCTE-35 Middleware API and Dashboard
+- **Port 1935**: RTMP Server
+- **Port 8000**: HLS/DASH Streams
+- **Port 8001**: RTMP Health Check
+
+## 🎮 Usage
+
+### **1. Launch the System**
 ```bash
-# Option A: Use the provided start.bat (Recommended)
-start.bat
-
-# Option B: Manual installation
-cd server
-npm install
+# Double-click or run:
+launch-scte35.bat
 ```
 
-### 3. Configure OBS Studio
+### **2. Access the Dashboard**
+- Open: `http://localhost:3000`
+- Navigate between tabs: Dashboard, Scheduler, RTMP Monitor, Settings
 
-**For each stream (stream1, stream2, etc.):**
+### **3. Configure OBS Studio**
+```
+Service: Custom
+Server: rtmp://localhost:1935/live
+Stream Key: stream1 (or any name)
+```
 
-1. **Settings → Output**
-   - Output Mode: `Advanced`
-   - Streaming Tab:
-     - Type: `Custom Output (FFmpeg)`
-     - FFmpeg Output Type: `Output to URL`
-     - File path or URL: `rtmp://localhost:1935/live/stream1`
-     - Container Format: `flv`
+### **4. Control SCTE-35 Markers**
+- **Quick CUE-OUT**: Press F1-F8 for 30-second ads
+- **Quick CUE-IN**: Press Ctrl+F1-F8
+- **Emergency CUE-IN ALL**: Press Ctrl+Shift+I
+- **Emergency CUE-OUT ALL**: Press Ctrl+Shift+O
 
-2. **Video Settings**
-   - Encoder: `libx264`
-   - Rate Control: `CBR`
-   - Bitrate: `2000-5000 kbps` (adjust as needed)
-   - Keyframe Interval: `2` seconds
-   - CPU Usage Preset: `veryfast`
+### **5. RTMP Server Management**
+- **Start/Stop**: Use RTMP Monitor tab
+- **Status Monitoring**: Real-time server status
+- **Connection Testing**: Built-in diagnostic tools
+- **OBS Setup**: Copy-paste configuration
 
-3. **Audio Settings**
-   - Encoder: `aac`
-   - Bitrate: `128 kbps`
+## 📊 Dashboard Tabs
 
-### 4. Start the Middleware
+### **📺 Dashboard Tab**
+- Stream monitoring and control
+- Ad preset management
+- Bulk operations
+- Hotkey support
+- Real-time health metrics
+
+### **📅 Scheduler Tab**
+- Advanced scheduling interface
+- Time-based ad scheduling
+- Custom PID configuration
+- Event ID management
+- Recurring schedules
+
+### **📡 RTMP Monitor Tab**
+- RTMP server status and controls
+- OBS configuration guide
+- Connection testing
+- Quick access links
+- Server information
+
+### **⚙️ Settings Tab**
+- System configuration
+- Quick actions
+- Documentation links
+- Export/import settings
+
+## 🔗 API Endpoints
+
+### **SCTE-35 Control**
+- `GET /api/streams` - Get all streams status
+- `POST /api/streams/:id/start` - Start stream
+- `POST /api/streams/:id/stop` - Stop stream
+- `POST /api/streams/:id/cue-out` - Inject CUE-OUT
+- `POST /api/streams/:id/cue-in` - Inject CUE-IN
+- `POST /api/cue-out-all` - CUE-OUT all streams
+- `POST /api/cue-in-all` - CUE-IN all streams
+
+### **RTMP Server Control**
+- `GET /api/rtmp/status` - Get RTMP server status
+- `POST /api/rtmp/start` - Start RTMP server
+- `POST /api/rtmp/stop` - Stop RTMP server
+- `POST /api/rtmp/restart` - Restart RTMP server
+- `POST /api/rtmp/test` - Test RTMP connection
+
+### **System**
+- `GET /api/health` - System health check
+
+## 🎯 Stream Endpoints
+
+### **RTMP Input**
+```
+rtmp://localhost:1935/live/{streamKey}
+```
+
+### **HLS Output**
+```
+http://localhost:8000/live/{streamKey}/index.m3u8
+```
+
+### **DASH Output**
+```
+http://localhost:8000/live/{streamKey}/index.mpd
+```
+
+### **SRT Output**
+```
+srt://localhost:1234?streamid={streamKey}
+```
+
+## 🚨 Troubleshooting
+
+### **Common Issues**
+
+#### **Port Already in Use**
 ```bash
-# Double-click start.bat or run from command line
-start.bat
+# Check what's using the port
+netstat -ano | findstr :3000
+netstat -ano | findstr :1935
+
+# Kill the process
+taskkill /PID <process_id> /F
 ```
 
-### 5. Access Web Interface
-Open your browser and navigate to:
-```
-http://localhost:3000
-```
+#### **OBS Connection Failed**
+1. Verify RTMP server is running
+2. Check OBS settings match configuration
+3. Test with different stream key
+4. Check firewall settings
 
-## 🎛️ Web Interface Guide
+#### **SCTE-35 Not Working**
+1. Verify FFmpeg is installed
+2. Check stream is running
+3. Review server logs
+4. Test with simple CUE-OUT
 
-### Main Dashboard
-- **Stream Cards**: Real-time status of each stream
-- **Control Panel**: Ad presets and bulk operations
-- **System Status**: Overall health monitoring
-
-### Stream Controls
-- **Start/Stop**: Stream management
-- **CUE-OUT**: Ad break insertion (30s, 60s, 120s, custom)
-- **CUE-IN**: Return from ad break
-- **Health Metrics**: Bitrate, FPS, uptime monitoring
-
-### Hotkey Commands
-| Key Combination | Action |
-|----------------|--------|
-| `F1-F8` | Quick CUE-OUT (30s) for streams 1-8 |
-| `Ctrl+F1-F8` | Quick CUE-IN for streams 1-8 |
-| `Ctrl+Shift+O` | Emergency CUE-OUT All streams |
-| `Ctrl+Shift+I` | Emergency CUE-IN All streams |
-
-### Drag & Drop Scheduling
-1. **Select Preset**: Choose from 30s, 60s, 120s, or custom duration
-2. **Drag to Stream**: Drop preset onto target stream card
-3. **Auto-Execute**: CUE-OUT command sent immediately
-
-## 🔧 Configuration
-
-### Stream Configuration (`server/streams.json`)
-```json
-{
-  "stream1": {
-    "name": "Main Channel",
-    "lastEventId": 100023,
-    "autoRestart": true,
-    "flussonicOutput": "main_channel",
-    "description": "Primary broadcast stream"
-  }
-}
-```
-
-### Flussonic Integration
-Add to your `flussonic.conf`:
-```nginx
-stream main_channel {
-  input srt://localhost:1234?streamid=stream1&pkt_size=1316;
-  scte35_pid 500;
-  
-  # Output to carrier/CDN
-  output rtmp://your-cdn-endpoint/live/main_channel;
-  
-  # Optional: Record with SCTE-35 markers
-  record /storage/recordings/main_channel;
-}
-```
-
-### Carrier Compliance Settings
-| Parameter | Value | Purpose |
-|-----------|-------|---------|
-| PID | 500 | SCTE-35 packet identifier |
-| Event ID | 100023+ | Sequential event numbering |
-| Packet Size | 1316 bytes | SRT optimization |
-| Duration | Configurable | Ad break length in seconds |
-
-## 📡 API Reference
-
-### Stream Management
+### **Debug Commands**
 ```bash
-# Get all streams status
-GET /api/streams
+# Check system status
+launch-scte35.bat (option 3)
 
-# Start stream
-POST /api/streams/{streamId}/start
+# Test RTMP connection
+launch-scte35.bat (option 2)
 
-# Stop stream
-POST /api/streams/{streamId}/stop
+# Check running processes
+tasklist | findstr node
+
+# View server logs
+# Check the service windows for detailed logs
 ```
 
-### SCTE-35 Control
-```bash
-# Send CUE-OUT
-POST /api/streams/{streamId}/cue-out
-Content-Type: application/json
-{
-  "duration": 30,
-  "eventId": 100025  // Optional
-}
+## 📚 Documentation
 
-# Send CUE-IN
-POST /api/streams/{streamId}/cue-in
-Content-Type: application/json
-{
-  "eventId": 100025  // Optional
-}
+### **Setup Guides**
+- **OBS Setup**: `OBS-RTMP-SETUP.md`
+- **Installation**: `INSTALLATION.md`
+- **Quick Start**: `QUICK-START.md`
 
-# Bulk operations
-POST /api/cue-out-all
-POST /api/cue-in-all
-```
+### **Feature Documentation**
+- **RTMP Controls**: `RTMP-CONTROLS-IMPLEMENTATION.md`
+- **Navigation Tabs**: `NAVIGATION-TABS.md`
+- **Scheduler**: `SCHEDULER-SOLUTION.md`
 
-### Monitoring
-```bash
-# System health
-GET /api/health
+### **Troubleshooting**
+- **Error Fixes**: `ERROR-FIX-SOLUTION.md`
+- **OBS Connection**: `FIX-OBS-CONNECTION.md`
+- **Immediate Fixes**: `IMMEDIATE-FIXES.md`
 
-# Stream logs
-GET /api/streams/{streamId}/logs
-```
+## 🎉 Benefits
 
-## 🛠️ Troubleshooting
+### **User Experience**
+- **One-Click Launch**: Single script starts everything
+- **Professional Interface**: Modern web dashboard
+- **Real-time Monitoring**: Live status updates
+- **Easy Configuration**: Copy-paste OBS settings
 
-### Common Issues
+### **Technical Benefits**
+- **Modular Design**: Separate RTMP and SCTE-35 servers
+- **Scalable Architecture**: Support for multiple streams
+- **Reliable Operation**: Auto-restart and error recovery
+- **Comprehensive Logging**: Detailed operation tracking
 
-**1. FFmpeg Not Found**
-```bash
-# Download FFmpeg from https://ffmpeg.org/download.html
-# Extract to bin/ffmpeg/ or add to system PATH
-```
+### **Production Ready**
+- **Stable Operation**: Professional-grade reliability
+- **Monitoring**: Real-time status tracking
+- **Documentation**: Complete setup guides
+- **Troubleshooting**: Built-in diagnostic tools
 
-**2. Node.js Dependencies**
-```bash
-cd server
-npm install express cors
-```
+## 🔮 Future Enhancements
 
-**3. OBS Connection Issues**
-- Verify RTMP URL: `rtmp://localhost:1935/live/stream1`
-- Check Windows Firewall settings
-- Ensure port 1935 is not blocked
+### **Planned Features**
+- **Connection Logs**: Real-time connection monitoring
+- **Stream Statistics**: Bitrate, FPS, viewer count
+- **Auto-restart**: Automatic recovery on failure
+- **Configuration Management**: Save/load server settings
 
-**4. SCTE-35 Not Working**
-- Verify FFmpeg supports SCTE-35 (`ffmpeg -filters | grep scte35`)
-- Check Flussonic configuration
-- Monitor logs in web interface
+### **Advanced Controls**
+- **Multiple Servers**: Manage multiple RTMP instances
+- **Load Balancing**: Distribute streams across servers
+- **Health Monitoring**: Advanced diagnostics
+- **Performance Metrics**: Detailed analytics
 
-**5. Stream Health Issues**
-- Check OBS output settings
-- Verify network connectivity
-- Monitor CPU usage
+## 📞 Support
 
-### Log Locations
-- **Middleware Logs**: Web interface → Show Logs
-- **FFmpeg Logs**: Console output
-- **OBS Logs**: Help → Log Files
+### **Getting Help**
+1. Check the troubleshooting section
+2. Review server logs for errors
+3. Test individual components
+4. Verify configuration settings
 
-### Performance Optimization
-- **CPU**: Use hardware encoding if available
-- **Network**: Dedicated network interface for streaming
-- **Storage**: SSD for better I/O performance
-
-## 🔒 Security Considerations
-
-- **Local Network**: Middleware runs on localhost by default
-- **Firewall**: Configure Windows Firewall for required ports
-- **Access Control**: Implement authentication for production use
-- **Monitoring**: Enable logging for audit trails
-
-## 📞 Support & Maintenance
-
-### Regular Maintenance
-1. **Update Dependencies**: `npm update` in server directory
-2. **Clear Logs**: Use web interface log clearing
-3. **Backup Config**: Save `streams.json` regularly
-4. **Monitor Performance**: Check system resources
-
-### Getting Help
-- **Documentation**: This README file
-- **Logs**: Check web interface and console output
-- **Community**: GitHub issues and discussions
-- **Professional Support**: Contact your broadcast engineer
-
-## 📄 License
-
-MIT License - See LICENSE file for details
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create feature branch
-3. Commit changes
-4. Push to branch
-5. Create Pull Request
-
-## 📈 Roadmap
-
-- [ ] Multi-language support
-- [ ] Advanced scheduling
-- [ ] Cloud integration
-- [ ] Mobile app companion
-- [ ] Analytics dashboard
-- [ ] Load balancing support
+### **Documentation**
+- **API Reference**: Available in server code
+- **Configuration**: Inline documentation
+- **Examples**: Included in setup guides
 
 ---
 
-**Version**: 1.0.0  
-**Last Updated**: 2024  
-**Compatibility**: Windows 10/11, OBS v28+, Node.js v14+
+## ✅ **Ready to Use**
 
-For technical support, please refer to the troubleshooting section or contact your system administrator.
+The SCTE-35 Broadcast Middleware is now a clean, professional solution with:
+
+1. **Single Launch Script**: `launch-scte35.bat` starts everything
+2. **Integrated RTMP Controls**: Full management from dashboard
+3. **Navigation Tabs**: Organized interface for all features
+4. **Comprehensive Documentation**: Complete setup and usage guides
+5. **Production Ready**: Stable, reliable operation
+
+**Get started now with `launch-scte35.bat`!**
