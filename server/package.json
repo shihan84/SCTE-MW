@@ -1,0 +1,39 @@
+{
+  "name": "scte35-broadcast-middleware",
+  "version": "1.0.0",
+  "description": "Windows-based SCTE-35 Middleware for Multi-OBS to Flussonic Streaming",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "test": "echo \"No tests specified\" && exit 0"
+  },
+  "keywords": [
+    "scte35",
+    "broadcast",
+    "obs",
+    "flussonic",
+    "streaming",
+    "middleware",
+    "rtmp",
+    "srt"
+  ],
+  "author": "SCTE-35 Middleware Team",
+  "license": "MIT",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "node-media-server": "^4.0.18"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-org/scte35-middleware"
+  },
+  "bugs": {
+    "url": "https://github.com/your-org/scte35-middleware/issues"
+  },
+  "homepage": "https://github.com/your-org/scte35-middleware#readme"
+}

@@ -1,0 +1,776 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Node Media Server Dashboard</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+    <style>
+        .rtmp-dashboard {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #0a0a0a;
+            min-height: 100vh;
+        }
+        
+        .dashboard-header {
+            background: linear-gradient(135deg, #1e1e1e 0%, #2a2a2a 100%);
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .dashboard-header h1 {
+            color: #00ff88;
+            margin: 0 0 10px 0;
+            font-size: 28px;
+        }
+        
+        .server-status {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .status-card {
+            background: linear-gradient(135deg, #1e1e1e 0%, #2a2a2a 100%);
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        .status-card.online {
+            border-color: #00ff88;
+            box-shadow: 0 0 10px rgba(0, 255, 136, 0.2);
+        }
+        
+        .status-card.offline {
+            border-color: #ff4444;
+            box-shadow: 0 0 10px rgba(255, 68, 68, 0.2);
+        }
+        
+        .status-card h3 {
+            color: #ccc;
+            margin: 0 0 10px 0;
+            font-size: 14px;
+            text-transform: uppercase;
+        }
+        
+        .status-value {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .status-value.online {
+            color: #00ff88;
+        }
+        
+        .status-value.offline {
+            color: #ff4444;
+        }
+        
+        .status-value.warning {
+            color: #ffaa00;
+        }
+        
+        .status-description {
+            color: #888;
+            font-size: 12px;
+        }
+        
+        .streams-section {
+            background: linear-gradient(135deg, #1e1e1e 0%, #2a2a2a 100%);
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .streams-section h2 {
+            color: #00ff88;
+            margin-bottom: 20px;
+            font-size: 20px;
+        }
+        
+        .streams-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+        
+        .stream-card {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid #444;
+            border-radius: 8px;
+            padding: 20px;
+            transition: all 0.3s ease;
+        }
+        
+        .stream-card.active {
+            border-color: #00ff88;
+            box-shadow: 0 0 15px rgba(0, 255, 136, 0.2);
+        }
+        
+        .stream-card.inactive {
+            border-color: #666;
+            opacity: 0.7;
+        }
+        
+        .stream-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .stream-name {
+            color: #00ff88;
+            font-weight: bold;
+            font-size: 16px;
+        }
+        
+        .stream-status {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        
+        .stream-status.live {
+            background: #00ff88;
+            color: #000;
+        }
+        
+        .stream-status.offline {
+            background: #666;
+            color: #fff;
+        }
+        
+        .stream-info {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        
+        .stream-metric {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid #555;
+            border-radius: 4px;
+            padding: 10px;
+            text-align: center;
+        }
+        
+        .stream-metric-label {
+            color: #ccc;
+            font-size: 11px;
+            text-transform: uppercase;
+            margin-bottom: 5px;
+        }
+        
+        .stream-metric-value {
+            color: #fff;
+            font-size: 14px;
+            font-weight: bold;
+        }
+        
+        .stream-controls {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        
+        .connections-section {
+            background: linear-gradient(135deg, #1e1e1e 0%, #2a2a2a 100%);
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .connections-section h2 {
+            color: #00ff88;
+            margin-bottom: 20px;
+            font-size: 20px;
+        }
+        
+        .connections-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        .connections-table th,
+        .connections-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #444;
+        }
+        
+        .connections-table th {
+            background: rgba(0, 0, 0, 0.3);
+            color: #00ff88;
+            font-weight: bold;
+            text-transform: uppercase;
+            font-size: 12px;
+        }
+        
+        .connections-table td {
+            color: #ccc;
+            font-size: 14px;
+        }
+        
+        .connection-status {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        
+        .connection-status.connected {
+            background: #00ff88;
+            color: #000;
+        }
+        
+        .connection-status.disconnected {
+            background: #ff4444;
+            color: #fff;
+        }
+        
+        .logs-section {
+            background: linear-gradient(135deg, #1e1e1e 0%, #2a2a2a 100%);
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 20px;
+        }
+        
+        .logs-section h2 {
+            color: #00ff88;
+            margin-bottom: 20px;
+            font-size: 20px;
+        }
+        
+        .logs-container {
+            background: #000;
+            border: 1px solid #444;
+            border-radius: 4px;
+            padding: 15px;
+            height: 300px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+        }
+        
+        .log-entry {
+            margin-bottom: 5px;
+            padding: 2px 0;
+        }
+        
+        .log-timestamp {
+            color: #888;
+        }
+        
+        .log-level-info {
+            color: #00ff88;
+        }
+        
+        .log-level-warn {
+            color: #ffaa00;
+        }
+        
+        .log-level-error {
+            color: #ff4444;
+        }
+        
+        .log-message {
+            color: #ccc;
+        }
+        
+        .refresh-controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            justify-content: center;
+        }
+        
+        .auto-refresh {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: #ccc;
+        }
+        
+        .nav-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-top: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="rtmp-dashboard">
+        <!-- Dashboard Header -->
+        <div class="dashboard-header">
+            <h1>📡 Node Media Server Dashboard</h1>
+            <p style="color: #ccc; margin: 0;">Real-time RTMP Server Monitoring & Control</p>
+            <div class="nav-buttons">
+                <button class="btn btn-info" onclick="window.location.href='nav.html'">
+                    ← Navigation Hub
+                </button>
+                <button class="btn btn-success" onclick="window.location.href='scheduler.html'">
+                    📅 Scheduler
+                </button>
+                <button class="btn btn-primary" onclick="window.location.href='index.html'">
+                    📺 Main Dashboard
+                </button>
+            </div>
+        </div>
+
+        <!-- Refresh Controls -->
+        <div class="refresh-controls">
+            <button class="btn btn-success" onclick="refreshAll()">
+                🔄 Refresh All
+            </button>
+            <div class="auto-refresh">
+                <input type="checkbox" id="auto-refresh" checked>
+                <label for="auto-refresh">Auto-refresh (5s)</label>
+            </div>
+            <button class="btn btn-warning" onclick="clearLogs()">
+                🗑️ Clear Logs
+            </button>
+        </div>
+
+        <!-- Server Status -->
+        <div class="server-status">
+            <div class="status-card" id="rtmp-status">
+                <h3>RTMP Server</h3>
+                <div class="status-value" id="rtmp-status-value">Checking...</div>
+                <div class="status-description">Port 1935</div>
+            </div>
+            
+            <div class="status-card" id="api-status">
+                <h3>API Server</h3>
+                <div class="status-value" id="api-status-value">Checking...</div>
+                <div class="status-description">Port 3000</div>
+            </div>
+            
+            <div class="status-card" id="active-streams">
+                <h3>Active Streams</h3>
+                <div class="status-value" id="active-streams-value">0</div>
+                <div class="status-description">Live Publishers</div>
+            </div>
+            
+            <div class="status-card" id="total-connections">
+                <h3>Total Connections</h3>
+                <div class="status-value" id="total-connections-value">0</div>
+                <div class="status-description">RTMP Clients</div>
+            </div>
+            
+            <div class="status-card" id="uptime">
+                <h3>Server Uptime</h3>
+                <div class="status-value" id="uptime-value">--:--:--</div>
+                <div class="status-description">Hours:Minutes:Seconds</div>
+            </div>
+            
+            <div class="status-card" id="data-transfer">
+                <h3>Data Transfer</h3>
+                <div class="status-value" id="data-transfer-value">0 MB</div>
+                <div class="status-description">Total Processed</div>
+            </div>
+        </div>
+
+        <!-- Active Streams -->
+        <div class="streams-section">
+            <h2>📺 Active RTMP Streams</h2>
+            <div class="streams-grid" id="streams-grid">
+                <div style="color: #888; text-align: center; padding: 40px; grid-column: 1 / -1;">
+                    No active streams. Start streaming from OBS to see streams here.
+                </div>
+            </div>
+        </div>
+
+        <!-- Connection Monitor -->
+        <div class="connections-section">
+            <h2>🔗 RTMP Connections</h2>
+            <div style="overflow-x: auto;">
+                <table class="connections-table">
+                    <thead>
+                        <tr>
+                            <th>Connection ID</th>
+                            <th>Client IP</th>
+                            <th>Stream Path</th>
+                            <th>Status</th>
+                            <th>Connected At</th>
+                            <th>Duration</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="connections-table-body">
+                        <tr>
+                            <td colspan="7" style="text-align: center; color: #888; padding: 20px;">
+                                No active connections
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Server Logs -->
+        <div class="logs-section">
+            <h2>📋 Server Logs</h2>
+            <div class="logs-container" id="logs-container">
+                <div class="log-entry">
+                    <span class="log-timestamp">[--:--:--]</span>
+                    <span class="log-level-info">[INFO]</span>
+                    <span class="log-message">Waiting for server logs...</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let serverStartTime = Date.now();
+        let logEntries = [];
+        let connectionData = [];
+        let streamData = {};
+        let autoRefreshInterval;
+
+        // Initialize dashboard
+        document.addEventListener('DOMContentLoaded', function() {
+            refreshAll();
+            startAutoRefresh();
+            
+            // Add some initial log entries
+            addLogEntry('info', 'Node Media Server Dashboard initialized');
+            addLogEntry('info', 'Monitoring RTMP server on port 1935');
+            addLogEntry('info', 'API server on port 3000');
+        });
+
+        // Auto-refresh functionality
+        function startAutoRefresh() {
+            const checkbox = document.getElementById('auto-refresh');
+            
+            if (checkbox.checked) {
+                autoRefreshInterval = setInterval(() => {
+                    if (checkbox.checked) {
+                        refreshAll();
+                    }
+                }, 5000);
+            }
+            
+            checkbox.addEventListener('change', function() {
+                if (this.checked) {
+                    startAutoRefresh();
+                } else {
+                    clearInterval(autoRefreshInterval);
+                }
+            });
+        }
+
+        // Refresh all data
+        async function refreshAll() {
+            await Promise.all([
+                checkServerStatus(),
+                loadStreams(),
+                loadConnections(),
+                updateUptime()
+            ]);
+        }
+
+        // Check server status
+        async function checkServerStatus() {
+            try {
+                // Check API server
+                const response = await axios.get('/api/health');
+                updateStatusCard('api-status', 'online', 'ONLINE');
+                updateStatusCard('active-streams', 'online', response.data.activeStreams || 0);
+                
+                // Assume RTMP server is running if API is running
+                updateStatusCard('rtmp-status', 'online', 'ONLINE');
+                
+                addLogEntry('info', `Health check successful - ${response.data.activeStreams} active streams`);
+                
+            } catch (error) {
+                updateStatusCard('api-status', 'offline', 'OFFLINE');
+                updateStatusCard('rtmp-status', 'offline', 'OFFLINE');
+                updateStatusCard('active-streams', 'offline', 0);
+                
+                addLogEntry('error', 'Server health check failed: ' + error.message);
+            }
+        }
+
+        // Load streams data
+        async function loadStreams() {
+            try {
+                const response = await axios.get('/api/streams');
+                streamData = response.data;
+                renderStreams();
+                
+                const activeCount = Object.keys(streamData).filter(id => streamData[id].status === 'running').length;
+                updateStatusCard('active-streams', activeCount > 0 ? 'online' : 'warning', activeCount);
+                
+            } catch (error) {
+                console.error('Error loading streams:', error);
+                addLogEntry('error', 'Failed to load streams data');
+            }
+        }
+
+        // Load connections (simulated for now)
+        function loadConnections() {
+            // Simulate connection data based on active streams
+            connectionData = [];
+            let connectionId = 1;
+            
+            Object.keys(streamData).forEach(streamId => {
+                if (streamData[streamId].status === 'running') {
+                    connectionData.push({
+                        id: connectionId++,
+                        clientIp: '127.0.0.1',
+                        streamPath: `/live/${streamId}`,
+                        status: 'connected',
+                        connectedAt: new Date(streamData[streamId].startTime || Date.now()).toLocaleTimeString(),
+                        duration: formatDuration(Date.now() - (streamData[streamId].startTime || Date.now()))
+                    });
+                }
+            });
+            
+            renderConnections();
+            updateStatusCard('total-connections', connectionData.length > 0 ? 'online' : 'warning', connectionData.length);
+        }
+
+        // Update status card
+        function updateStatusCard(cardId, status, value) {
+            const card = document.getElementById(cardId);
+            const valueElement = document.getElementById(cardId + '-value');
+            
+            if (card && valueElement) {
+                card.className = `status-card ${status}`;
+                valueElement.className = `status-value ${status}`;
+                valueElement.textContent = value;
+            }
+        }
+
+        // Render streams
+        function renderStreams() {
+            const grid = document.getElementById('streams-grid');
+            
+            if (Object.keys(streamData).length === 0) {
+                grid.innerHTML = `
+                    <div style="color: #888; text-align: center; padding: 40px; grid-column: 1 / -1;">
+                        No active streams. Start streaming from OBS to see streams here.
+                        <br><br>
+                        <strong>OBS URL:</strong> rtmp://localhost:1935/live/stream1
+                    </div>
+                `;
+                return;
+            }
+            
+            grid.innerHTML = Object.keys(streamData).map(streamId => {
+                const stream = streamData[streamId];
+                const isActive = stream.status === 'running';
+                
+                return `
+                    <div class="stream-card ${isActive ? 'active' : 'inactive'}">
+                        <div class="stream-header">
+                            <div class="stream-name">${stream.name || streamId}</div>
+                            <div class="stream-status ${isActive ? 'live' : 'offline'}">
+                                ${isActive ? 'LIVE' : 'OFFLINE'}
+                            </div>
+                        </div>
+                        
+                        <div class="stream-info">
+                            <div class="stream-metric">
+                                <div class="stream-metric-label">Bitrate</div>
+                                <div class="stream-metric-value">${stream.health?.bitrate || 0} kbps</div>
+                            </div>
+                            <div class="stream-metric">
+                                <div class="stream-metric-label">FPS</div>
+                                <div class="stream-metric-value">${stream.health?.fps || 0}</div>
+                            </div>
+                            <div class="stream-metric">
+                                <div class="stream-metric-label">Event ID</div>
+                                <div class="stream-metric-value">${stream.lastEventId || 'N/A'}</div>
+                            </div>
+                            <div class="stream-metric">
+                                <div class="stream-metric-label">Uptime</div>
+                                <div class="stream-metric-value">${stream.startTime ? formatDuration(Date.now() - stream.startTime) : 'N/A'}</div>
+                            </div>
+                        </div>
+                        
+                        <div class="stream-controls">
+                            <button class="btn btn-sm btn-warning" onclick="sendCueOut('${streamId}', 30)">
+                                CUE-OUT 30s
+                            </button>
+                            <button class="btn btn-sm btn-success" onclick="sendCueIn('${streamId}')">
+                                CUE-IN
+                            </button>
+                            <button class="btn btn-sm btn-info" onclick="viewStreamLogs('${streamId}')">
+                                View Logs
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Render connections
+        function renderConnections() {
+            const tbody = document.getElementById('connections-table-body');
+            
+            if (connectionData.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="7" style="text-align: center; color: #888; padding: 20px;">
+                            No active connections
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+            
+            tbody.innerHTML = connectionData.map(conn => `
+                <tr>
+                    <td>#${conn.id}</td>
+                    <td>${conn.clientIp}</td>
+                    <td><code>${conn.streamPath}</code></td>
+                    <td>
+                        <span class="connection-status ${conn.status}">
+                            ${conn.status.toUpperCase()}
+                        </span>
+                    </td>
+                    <td>${conn.connectedAt}</td>
+                    <td>${conn.duration}</td>
+                    <td>
+                        <button class="btn btn-sm btn-danger" onclick="disconnectClient(${conn.id})">
+                            Disconnect
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        // Update uptime
+        function updateUptime() {
+            const uptime = Date.now() - serverStartTime;
+            const uptimeFormatted = formatDuration(uptime);
+            updateStatusCard('uptime', 'online', uptimeFormatted);
+        }
+
+        // Format duration
+        function formatDuration(ms) {
+            const seconds = Math.floor(ms / 1000);
+            const minutes = Math.floor(seconds / 60);
+            const hours = Math.floor(minutes / 60);
+            
+            return `${hours.toString().padStart(2, '0')}:${(minutes % 60).toString().padStart(2, '0')}:${(seconds % 60).toString().padStart(2, '0')}`;
+        }
+
+        // Add log entry
+        function addLogEntry(level, message) {
+            const timestamp = new Date().toLocaleTimeString();
+            const entry = {
+                timestamp,
+                level,
+                message
+            };
+            
+            logEntries.unshift(entry);
+            
+            // Keep only last 100 entries
+            if (logEntries.length > 100) {
+                logEntries = logEntries.slice(0, 100);
+            }
+            
+            renderLogs();
+        }
+
+        // Render logs
+        function renderLogs() {
+            const container = document.getElementById('logs-container');
+            
+            container.innerHTML = logEntries.map(entry => `
+                <div class="log-entry">
+                    <span class="log-timestamp">[${entry.timestamp}]</span>
+                    <span class="log-level-${entry.level}">[${entry.level.toUpperCase()}]</span>
+                    <span class="log-message">${entry.message}</span>
+                </div>
+            `).join('');
+            
+            // Auto-scroll to top for newest entries
+            container.scrollTop = 0;
+        }
+
+        // Clear logs
+        function clearLogs() {
+            logEntries = [];
+            renderLogs();
+            addLogEntry('info', 'Logs cleared');
+        }
+
+        // Send CUE-OUT
+        async function sendCueOut(streamId, duration) {
+            try {
+                await axios.post(`/api/streams/${streamId}/cue-out`, { duration });
+                addLogEntry('info', `CUE-OUT sent to ${streamId} for ${duration}s`);
+            } catch (error) {
+                addLogEntry('error', `Failed to send CUE-OUT to ${streamId}: ${error.message}`);
+            }
+        }
+
+        // Send CUE-IN
+        async function sendCueIn(streamId) {
+            try {
+                await axios.post(`/api/streams/${streamId}/cue-in`);
+                addLogEntry('info', `CUE-IN sent to ${streamId}`);
+            } catch (error) {
+                addLogEntry('error', `Failed to send CUE-IN to ${streamId}: ${error.message}`);
+            }
+        }
+
+        // View stream logs
+        function viewStreamLogs(streamId) {
+            const stream = streamData[streamId];
+            if (stream && stream.scte35Log) {
+                const logs = stream.scte35Log.slice(-10);
+                alert(`Recent SCTE-35 logs for ${streamId}:\n\n` + 
+                      logs.map(log => `${log.timestamp}: ${log.command} (Event ID: ${log.eventId})`).join('\n'));
+            } else {
+                alert(`No logs available for ${streamId}`);
+            }
+        }
+
+        // Disconnect client (simulated)
+        function disconnectClient(connectionId) {
+            if (confirm('Are you sure you want to disconnect this client?')) {
+                connectionData = connectionData.filter(conn => conn.id !== connectionId);
+                renderConnections();
+                addLogEntry('warn', `Client connection #${connectionId} disconnected`);
+            }
+        }
+
+        // Simulate some activity
+        setInterval(() => {
+            if (Math.random() > 0.7) {
+                const messages = [
+                    'RTMP handshake completed',
+                    'Stream metadata received',
+                    'Video keyframe detected',
+                    'Audio packet processed',
+                    'Connection heartbeat'
+                ];
+                addLogEntry('info', messages[Math.floor(Math.random() * messages.length)]);
+            }
+        }, 10000);
+    </script>
+</body>
+</html>
