@@ -253,9 +253,9 @@ app.get('/api/streams/:streamName', (req, res) => {
         startTime: stream.startTime,
         status: stream.status,
         uptime: Date.now() - stream.startTime.getTime()
+        });
     });
-});
-
+    
 // SCTE-35 Scheduler Routes
 
 // Get all schedules
@@ -853,7 +853,7 @@ app.post('/api/rtmp/test', (req, res) => {
 
 app.post('/api/rtmp/stream/:streamId/disconnect', (req, res) => {
     try {
-        const { streamId } = req.params;
+    const { streamId } = req.params;
         
         // Find and disconnect the stream
         if (nms && nms.sessions) {
@@ -862,9 +862,9 @@ app.post('/api/rtmp/stream/:streamId/disconnect', (req, res) => {
                 session.close();
                 console.log(`Stream ${streamId} disconnected`);
             }
-        }
-        
-        res.json({
+    }
+
+    res.json({
             success: true,
             message: `Stream ${streamId} disconnected successfully`
         });
@@ -892,6 +892,38 @@ app.get('/api/rtmp/status', (req, res) => {
         });
     } catch (error) {
         console.error('Error getting RTMP status:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
+app.get('/api/rtmp/logs', (req, res) => {
+    try {
+        const logs = global.rtmpEvents || [];
+        res.json({
+            success: true,
+            logs: logs.slice(-50) // Return last 50 events
+        });
+            } catch (error) {
+        console.error('Error getting RTMP logs:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
+app.post('/api/rtmp/logs/clear', (req, res) => {
+    try {
+        global.rtmpEvents = [];
+        res.json({
+            success: true,
+            message: 'RTMP logs cleared'
+        });
+    } catch (error) {
+        console.error('Error clearing RTMP logs:', error);
         res.status(500).json({
             success: false,
             error: error.message
@@ -963,7 +995,7 @@ function stopFFmpegProcess(streamName) {
             activeStreams.delete(streamName);
             console.log(`FFmpeg process stopped for ${streamName}`);
         }
-    } catch (error) {
+            } catch (error) {
         console.error(`Error stopping FFmpeg process for ${streamName}:`, error);
     }
 }
@@ -975,7 +1007,7 @@ function initializeNodeMediaServer() {
         
         // RTMP event handlers
         nms.on('prePublish', (id, StreamPath, args) => {
-            console.log('[NodeEvent on prePublish]', `id=${id} StreamPath=${StreamPath} args=${JSON.stringify(args)}`);
+            console.log('[RTMP] Stream starting:', `id=${id} StreamPath=${StreamPath}`);
             
             // Extract stream name from StreamPath
             let streamName = 'live-stream';
@@ -986,11 +1018,20 @@ function initializeNodeMediaServer() {
                 }
             }
             
-            console.log(`Stream starting: ${streamName}`);
+            console.log(`[RTMP] Stream starting: ${streamName}`);
+            
+            // Emit event for web interface
+            global.rtmpEvents = global.rtmpEvents || [];
+            global.rtmpEvents.push({
+                timestamp: new Date().toISOString(),
+                type: 'prePublish',
+                streamName: streamName,
+                message: `Stream starting: ${streamName}`
+            });
         });
         
         nms.on('postPublish', (id, StreamPath, args) => {
-            console.log('[NodeEvent on postPublish]', `id=${id} StreamPath=${StreamPath} args=${JSON.stringify(args)}`);
+            console.log('[RTMP] Stream started:', `id=${id} StreamPath=${StreamPath}`);
             
             // Extract stream name from StreamPath
             let streamName = 'live-stream';
@@ -1001,14 +1042,23 @@ function initializeNodeMediaServer() {
                 }
             }
             
-            console.log(`Stream started: ${streamName}`);
+            console.log(`[RTMP] Stream started: ${streamName}`);
+            
+            // Emit event for web interface
+            global.rtmpEvents = global.rtmpEvents || [];
+            global.rtmpEvents.push({
+                timestamp: new Date().toISOString(),
+                type: 'postPublish',
+                streamName: streamName,
+                message: `Stream started: ${streamName}`
+            });
             
             // Start FFmpeg process for HLS/DASH output
             startFFmpegProcess(streamName);
         });
         
         nms.on('donePublish', (id, StreamPath, args) => {
-            console.log('[NodeEvent on donePublish]', `id=${id} StreamPath=${StreamPath} args=${JSON.stringify(args)}`);
+            console.log('[RTMP] Stream ended:', `id=${id} StreamPath=${StreamPath}`);
             
             // Extract stream name from StreamPath
             let streamName = 'live-stream';
@@ -1019,10 +1069,50 @@ function initializeNodeMediaServer() {
                 }
             }
             
-            console.log(`Stream ended: ${streamName}`);
+            console.log(`[RTMP] Stream ended: ${streamName}`);
+            
+            // Emit event for web interface
+            global.rtmpEvents = global.rtmpEvents || [];
+            global.rtmpEvents.push({
+                timestamp: new Date().toISOString(),
+                type: 'donePublish',
+                streamName: streamName,
+                message: `Stream ended: ${streamName}`
+            });
             
             // Stop FFmpeg process
             stopFFmpegProcess(streamName);
+        });
+        
+        // Add connection event handlers
+        nms.on('preConnect', (id, args) => {
+            console.log('[RTMP] Client connecting:', `id=${id}`);
+            global.rtmpEvents = global.rtmpEvents || [];
+            global.rtmpEvents.push({
+        timestamp: new Date().toISOString(),
+                type: 'preConnect',
+                message: `Client connecting: ${id}`
+    });
+});
+
+        nms.on('postConnect', (id, args) => {
+            console.log('[RTMP] Client connected:', `id=${id}`);
+            global.rtmpEvents = global.rtmpEvents || [];
+            global.rtmpEvents.push({
+                timestamp: new Date().toISOString(),
+                type: 'postConnect',
+                message: `Client connected: ${id}`
+            });
+        });
+        
+        nms.on('doneConnect', (id, args) => {
+            console.log('[RTMP] Client disconnected:', `id=${id}`);
+            global.rtmpEvents = global.rtmpEvents || [];
+            global.rtmpEvents.push({
+                timestamp: new Date().toISOString(),
+                type: 'doneConnect',
+                message: `Client disconnected: ${id}`
+            });
         });
         
         nms.run();
