@@ -15,6 +15,105 @@
         </div>
 
         <div class="dashboard">
+            <!-- RTMP Server Management -->
+            <div class="card">
+                <h2><i class="fas fa-broadcast-tower"></i> RTMP Server Management</h2>
+                
+                <div class="dashboard">
+                    <!-- RTMP Server Status -->
+                    <div class="stream-status">
+                        <div class="stream-info">
+                            <span class="status-indicator" id="rtmpServerStatus"></span>
+                            <span id="rtmpServerStatusText">RTMP Server: Stopped</span>
+                        </div>
+                        <div id="rtmpServerUptime">00:00:00</div>
+                    </div>
+                    
+                    <div class="stream-metrics">
+                        <div class="metric">
+                            <div class="metric-value" id="rtmpConnections">0</div>
+                            <div class="metric-label">Active Connections</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-value" id="rtmpStreams">0</div>
+                            <div class="metric-label">Active Streams</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-value" id="rtmpBandwidth">0</div>
+                            <div class="metric-label">Bandwidth (Mbps)</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-value" id="rtmpErrors">0</div>
+                            <div class="metric-label">Errors</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- RTMP Server Controls -->
+                <div class="scte35-controls">
+                    <button class="btn btn-success" onclick="startRtmpServer()" id="startRtmpBtn">
+                        <i class="fas fa-play"></i> Start RTMP Server
+                    </button>
+                    <button class="btn btn-danger" onclick="stopRtmpServer()" id="stopRtmpBtn" disabled>
+                        <i class="fas fa-stop"></i> Stop RTMP Server
+                    </button>
+                    <button class="btn btn-warning" onclick="restartRtmpServer()" id="restartRtmpBtn" disabled>
+                        <i class="fas fa-redo"></i> Restart Server
+                    </button>
+                    <button class="btn" onclick="testRtmpServer()">
+                        <i class="fas fa-plug"></i> Test Connection
+                    </button>
+                </div>
+                
+                <!-- RTMP Configuration -->
+                <div class="form-group">
+                    <label>RTMP Server Port:</label>
+                    <input type="number" id="rtmpPort" value="1935" min="1024" max="65535">
+                </div>
+                
+                <div class="form-group">
+                    <label>HTTP Server Port (HLS/DASH):</label>
+                    <input type="number" id="httpPort" value="8000" min="1024" max="65535">
+                </div>
+                
+                <div class="form-group">
+                    <label>Max Connections:</label>
+                    <input type="number" id="maxConnections" value="100" min="1" max="1000">
+                </div>
+                
+                <div class="form-group">
+                    <label>Stream Buffer Size (MB):</label>
+                    <input type="number" id="bufferSize" value="10" min="1" max="100">
+                </div>
+                
+                <div class="form-group">
+                    <label>Enable Authentication:</label>
+                    <select id="enableAuth">
+                        <option value="false">No Authentication</option>
+                        <option value="true">Basic Authentication</option>
+                    </select>
+                </div>
+                
+                <!-- Active Streams List -->
+                <div class="flussonic-config">
+                    <h4><i class="fas fa-video"></i> Active Streams</h4>
+                    <div id="activeStreamsList" style="margin-top: 15px;">
+                        <div class="alert alert-warning">No active streams</div>
+                    </div>
+                </div>
+                
+                <!-- RTMP Server Logs -->
+                <div class="flussonic-config">
+                    <h4><i class="fas fa-terminal"></i> RTMP Server Logs</h4>
+                    <div class="log-container" id="rtmpLogContainer" style="height: 150px;">
+                        <div>[INFO] RTMP Server Management initialized</div>
+                    </div>
+                    <button class="btn" onclick="clearRtmpLogs()">
+                        <i class="fas fa-trash"></i> Clear RTMP Logs
+                    </button>
+                </div>
+            </div>
+
             <!-- OBS Configuration -->
             <div class="card">
                 <h2><i class="fas fa-video"></i> OBS Studio Configuration</h2>
@@ -148,14 +247,27 @@
                     </div>
                 </div>
                 
+                <div class="scte35-controls">
+                    <div class="form-group">
+                        <label>Recurrence:</label>
+                        <select id="recurrence">
+                            <option value="none">One Time</option>
+                            <option value="daily">Daily</option>
+                            <option value="weekly">Weekly</option>
+                            <option value="monthly">Monthly</option>
+                            <option value="hourly">Hourly</option>
+                            <option value="minutely">Every Minute</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Recurrence Interval:</label>
+                        <input type="number" id="recurrenceInterval" value="1" min="1" placeholder="Every X days/weeks/months">
+                    </div>
+                </div>
+                
                 <div class="form-group">
-                    <label>Recurrence:</label>
-                    <select id="recurrence">
-                        <option value="none">One Time</option>
-                        <option value="daily">Daily</option>
-                        <option value="weekly">Weekly</option>
-                        <option value="hourly">Hourly</option>
-                    </select>
+                    <label>End Time (Optional):</label>
+                    <input type="datetime-local" id="scheduleEnd" placeholder="Leave empty for no end">
                 </div>
                 
                 <button class="btn btn-success" onclick="addScheduledAd()">

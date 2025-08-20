@@ -751,6 +751,133 @@ app.post('/api/scte35/sidecar', async (req, res) => {
     }
 });
 
+// RTMP Server Management Endpoints
+app.post('/api/rtmp/config', (req, res) => {
+    try {
+        const { rtmpPort, httpPort, maxConnections, bufferSize, enableAuth } = req.body;
+        
+        // Update NodeMediaServer configuration
+        if (nms) {
+            nms.config.rtmp.port = rtmpPort;
+            nms.config.http.port = httpPort;
+            nms.config.rtmp.maxConnections = maxConnections;
+            nms.config.rtmp.bufferSize = bufferSize * 1024 * 1024; // Convert MB to bytes
+        }
+        
+        console.log('RTMP server configuration updated:', req.body);
+        
+        res.json({
+            success: true,
+            message: 'RTMP server configuration applied successfully'
+        });
+    } catch (error) {
+        console.error('Error updating RTMP config:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
+app.post('/api/rtmp/stop', (req, res) => {
+    try {
+        if (nms) {
+            nms.stop();
+            console.log('RTMP server stopped');
+        }
+        
+        res.json({
+            success: true,
+            message: 'RTMP server stopped successfully'
+        });
+    } catch (error) {
+        console.error('Error stopping RTMP server:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
+app.post('/api/rtmp/test', (req, res) => {
+    try {
+        const { port } = req.body;
+        
+        // Test if port is available
+        const net = require('net');
+        const server = net.createServer();
+        
+        server.listen(port, () => {
+            server.close();
+            res.json({
+                success: true,
+                message: `Port ${port} is available`
+            });
+        });
+        
+        server.on('error', (err) => {
+            res.json({
+                success: false,
+                error: `Port ${port} is not available: ${err.message}`
+            });
+        });
+    } catch (error) {
+        console.error('Error testing RTMP port:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
+app.post('/api/rtmp/stream/:streamId/disconnect', (req, res) => {
+    try {
+        const { streamId } = req.params;
+        
+        // Find and disconnect the stream
+        if (nms && nms.sessions) {
+            const session = nms.sessions.get(streamId);
+            if (session) {
+                session.close();
+                console.log(`Stream ${streamId} disconnected`);
+            }
+        }
+        
+        res.json({
+            success: true,
+            message: `Stream ${streamId} disconnected successfully`
+        });
+    } catch (error) {
+        console.error('Error disconnecting stream:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
+app.get('/api/rtmp/status', (req, res) => {
+    try {
+        const status = {
+            running: nms ? true : false,
+            connections: nms ? nms.sessions.size : 0,
+            streams: activeStreams.size,
+            uptime: nms ? Date.now() - nms.startTime : 0
+        };
+        
+        res.json({
+            success: true,
+            status: status
+        });
+    } catch (error) {
+        console.error('Error getting RTMP status:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
 // Error handling middleware
 app.use((error, req, res, next) => {
     console.error('Unhandled error:', error);
