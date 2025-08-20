@@ -3,19 +3,32 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SCTE-35 Stream Management - OBS to Flussonic</title>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <title>SCTE-35 Stream Management</title>
     <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
 <body>
     <div class="container">
         <div class="header">
             <h1><i class="fas fa-broadcast-tower"></i> SCTE-35 Stream Management</h1>
-            <p>OBS Studio → SCTE-35 Middleware → Flussonic Media Server</p>
+            <p>Professional RTMP Server with SCTE-35 Ad Insertion</p>
         </div>
 
-        <div class="dashboard">
-            <!-- RTMP Server Management -->
+        <!-- Navigation Tabs -->
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('rtmp')">
+                <i class="fas fa-server"></i> RTMP Server
+            </button>
+            <button class="tab" onclick="switchTab('scte35')">
+                <i class="fas fa-ad"></i> SCTE-35 Controls
+            </button>
+            <button class="tab" onclick="switchTab('streams')">
+                <i class="fas fa-play-circle"></i> Stream Access
+            </button>
+        </div>
+
+        <!-- RTMP Server Management -->
+        <div id="rtmp" class="tab-content active">
             <div class="card">
                 <h2><i class="fas fa-broadcast-tower"></i> RTMP Server Management</h2>
                 
@@ -86,14 +99,6 @@
                     <input type="number" id="bufferSize" value="10" min="1" max="100">
                 </div>
                 
-                <div class="form-group">
-                    <label>Enable Authentication:</label>
-                    <select id="enableAuth">
-                        <option value="false">No Authentication</option>
-                        <option value="true">Basic Authentication</option>
-                    </select>
-                </div>
-                
                 <!-- Active Streams List -->
                 <div class="flussonic-config">
                     <h4><i class="fas fa-video"></i> Active Streams</h4>
@@ -113,254 +118,177 @@
                     </button>
                 </div>
             </div>
-
-            <!-- OBS Configuration -->
-            <div class="card">
-                <h2><i class="fas fa-video"></i> OBS Studio Configuration</h2>
-                
-                <div class="form-group">
-                    <label>RTMP Server URL:</label>
-                    <input type="text" id="rtmpUrl" value="rtmp://localhost:1935/live" placeholder="rtmp://your-server:1935/live">
-                </div>
-                
-                <div class="form-group">
-                    <label>Stream Key:</label>
-                    <input type="text" id="streamKey" value="obs-stream" placeholder="Enter stream key">
-                </div>
-                
-                <div class="form-group">
-                    <label>Video Bitrate (kbps):</label>
-                    <input type="number" id="videoBitrate" value="2500" min="500" max="8000">
-                </div>
-                
-                <div class="form-group">
-                    <label>Audio Bitrate (kbps):</label>
-                    <input type="number" id="audioBitrate" value="128" min="64" max="320">
-                </div>
-                
-                <div class="form-group">
-                    <label>Resolution:</label>
-                    <select id="resolution">
-                        <option value="1920x1080">1920x1080 (Full HD)</option>
-                        <option value="1280x720">1280x720 (HD)</option>
-                        <option value="854x480">854x480 (SD)</option>
-                    </select>
-                </div>
-                
-                <button class="btn btn-success" onclick="testOBSConnection()">
-                    <i class="fas fa-plug"></i> Test Connection
-                </button>
-                <button class="btn" onclick="copyOBSSettings()">
-                    <i class="fas fa-copy"></i> Copy Settings
-                </button>
-            </div>
-
-            <!-- Stream Status -->
-            <div class="card">
-                <h2><i class="fas fa-chart-line"></i> Stream Status</h2>
-                
-                <div class="stream-status">
-                    <div class="stream-info">
-                        <span class="status-indicator" id="streamStatus"></span>
-                        <span id="streamStatusText">Offline</span>
-                    </div>
-                    <div id="streamDuration">00:00:00</div>
-                </div>
-                
-                <div class="stream-metrics">
-                    <div class="metric">
-                        <div class="metric-value" id="currentBitrate">0</div>
-                        <div class="metric-label">Bitrate (kbps)</div>
-                    </div>
-                    <div class="metric">
-                        <div class="metric-value" id="currentFPS">0</div>
-                        <div class="metric-label">FPS</div>
-                    </div>
-                    <div class="metric">
-                        <div class="metric-value" id="droppedFrames">0</div>
-                        <div class="metric-label">Dropped Frames</div>
-                    </div>
-                    <div class="metric">
-                        <div class="metric-value" id="scte35Events">0</div>
-                        <div class="metric-label">SCTE-35 Events</div>
-                    </div>
-                </div>
-                
-                <button class="btn btn-success" onclick="startStream()" id="startBtn">
-                    <i class="fas fa-play"></i> Start Stream
-                </button>
-                <button class="btn btn-danger" onclick="stopStream()" id="stopBtn" disabled>
-                    <i class="fas fa-stop"></i> Stop Stream
-                </button>
-            </div>
         </div>
 
-        <!-- SCTE-35 Management -->
-        <div class="card">
-            <h2><i class="fas fa-clock"></i> SCTE-35 Ad Management</h2>
-            
-            <div class="tabs">
-                <div class="tab active" onclick="switchTab('manual')">Manual Cues</div>
-                <div class="tab" onclick="switchTab('scheduled')">Scheduled Ads</div>
-                <div class="tab" onclick="switchTab('templates')">Ad Templates</div>
-            </div>
-            
-            <!-- Manual Cues Tab -->
-            <div class="tab-content active" id="manual">
+        <!-- SCTE-35 Controls -->
+        <div id="scte35" class="tab-content">
+            <div class="card">
+                <h2><i class="fas fa-ad"></i> SCTE-35 Ad Insertion</h2>
+                
+                <div class="dashboard">
+                    <div class="stream-status">
+                        <div class="stream-info">
+                            <span class="status-indicator" id="streamStatus"></span>
+                            <span id="streamStatusText">Stream: Offline</span>
+                        </div>
+                        <div id="streamDuration">00:00:00</div>
+                    </div>
+                    
+                    <div class="stream-metrics">
+                        <div class="metric">
+                            <div class="metric-value" id="scte35Events">0</div>
+                            <div class="metric-label">SCTE-35 Events</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-value" id="activeAds">0</div>
+                            <div class="metric-label">Active Ads</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Manual SCTE-35 Controls -->
                 <div class="scte35-controls">
                     <div class="form-group">
                         <label>Event ID:</label>
-                        <input type="number" id="eventId" value="12345" min="1">
+                        <input type="number" id="eventId" value="10001" min="10000" max="99999">
                     </div>
+                    
                     <div class="form-group">
                         <label>Duration (seconds):</label>
-                        <input type="number" id="cueDuration" value="30" min="1" max="300">
+                        <input type="number" id="cueDuration" value="30" min="1" max="3600">
                     </div>
+                    
+                    <button class="btn btn-warning" onclick="sendCueOut()">
+                        <i class="fas fa-stop-circle"></i> Send CUE-OUT
+                    </button>
+                    <button class="btn btn-success" onclick="sendCueIn()">
+                        <i class="fas fa-play-circle"></i> Send CUE-IN
+                    </button>
+                    <button class="btn" onclick="sendTimeSignal()">
+                        <i class="fas fa-clock"></i> Time Signal
+                    </button>
                 </div>
-                
-                <button class="btn btn-warning" onclick="sendCueOut()">
-                    <i class="fas fa-sign-out-alt"></i> Send CUE-OUT
-                </button>
-                <button class="btn btn-success" onclick="sendCueIn()">
-                    <i class="fas fa-sign-in-alt"></i> Send CUE-IN
-                </button>
-                <button class="btn" onclick="sendTimeSignal()">
-                    <i class="fas fa-clock"></i> Send Time Signal
-                </button>
-            </div>
-            
-            <!-- Scheduled Ads Tab -->
-            <div class="tab-content" id="scheduled">
-                <div class="form-group">
-                    <label>Ad Schedule Name:</label>
-                    <input type="text" id="scheduleName" placeholder="Morning Ad Break">
-                </div>
-                
-                <div class="scte35-controls">
+
+                <!-- Scheduled Ads -->
+                <div class="flussonic-config">
+                    <h4><i class="fas fa-calendar-alt"></i> Scheduled Ads</h4>
+                    
+                    <div class="form-group">
+                        <label>Ad Name:</label>
+                        <input type="text" id="scheduleName" placeholder="Enter ad name">
+                    </div>
+                    
                     <div class="form-group">
                         <label>Start Time:</label>
                         <input type="datetime-local" id="scheduleStart">
                     </div>
+                    
                     <div class="form-group">
                         <label>Duration (seconds):</label>
-                        <input type="number" id="scheduleDuration" value="60" min="1">
+                        <input type="number" id="scheduleDuration" value="60" min="1" max="3600">
                     </div>
-                </div>
-                
-                <div class="scte35-controls">
+                    
                     <div class="form-group">
                         <label>Recurrence:</label>
                         <select id="recurrence">
-                            <option value="none">One Time</option>
+                            <option value="once">Once</option>
                             <option value="daily">Daily</option>
                             <option value="weekly">Weekly</option>
                             <option value="monthly">Monthly</option>
                             <option value="hourly">Hourly</option>
-                            <option value="minutely">Every Minute</option>
                         </select>
                     </div>
+                    
                     <div class="form-group">
-                        <label>Recurrence Interval:</label>
-                        <input type="number" id="recurrenceInterval" value="1" min="1" placeholder="Every X days/weeks/months">
+                        <label>Interval:</label>
+                        <input type="number" id="recurrenceInterval" value="1" min="1" max="100">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>End Date (Optional):</label>
+                        <input type="datetime-local" id="scheduleEnd">
+                    </div>
+                    
+                    <button class="btn btn-primary" onclick="addScheduledAd()">
+                        <i class="fas fa-plus"></i> Add Scheduled Ad
+                    </button>
+                    
+                    <div id="scheduledAdsList" style="margin-top: 15px;">
+                        <div class="alert alert-warning">No scheduled ads found</div>
                     </div>
                 </div>
-                
-                <div class="form-group">
-                    <label>End Time (Optional):</label>
-                    <input type="datetime-local" id="scheduleEnd" placeholder="Leave empty for no end">
-                </div>
-                
-                <button class="btn btn-success" onclick="addScheduledAd()">
-                    <i class="fas fa-plus"></i> Add Scheduled Ad
-                </button>
-                
-                <div id="scheduledAdsList" style="margin-top: 20px;"></div>
-            </div>
-            
-            <!-- Ad Templates Tab -->
-            <div class="tab-content" id="templates">
-                <div class="form-group">
-                    <label>Template Name:</label>
-                    <input type="text" id="templateName" placeholder="30-second Ad">
-                </div>
-                
-                <div class="form-group">
-                    <label>Ad Duration (seconds):</label>
-                    <input type="number" id="templateDuration" value="30" min="1">
-                </div>
-                
-                <div class="form-group">
-                    <label>Description:</label>
-                    <textarea id="templateDescription" rows="3" placeholder="Description of this ad template"></textarea>
-                </div>
-                
-                <button class="btn btn-success" onclick="saveTemplate()">
-                    <i class="fas fa-save"></i> Save Template
-                </button>
-                
-                <div id="templatesList" style="margin-top: 20px;"></div>
             </div>
         </div>
 
-        <!-- Flussonic Configuration -->
-        <div class="card">
-            <h2><i class="fas fa-server"></i> Flussonic Media Server</h2>
-            
-            <div class="form-group">
-                <label>Flussonic Server URL:</label>
-                <input type="text" id="flussonicUrl" value="http://localhost:8080" placeholder="http://your-flussonic-server:8080">
-            </div>
-            
-            <div class="form-group">
-                <label>API Key:</label>
-                <input type="password" id="flussonicApiKey" placeholder="Enter Flussonic API key">
-            </div>
-            
-            <div class="form-group">
-                <label>Stream Name:</label>
-                <input type="text" id="flussonicStreamName" value="live-stream" placeholder="Enter stream name">
-            </div>
-            
-            <button class="btn btn-success" onclick="testFlussonicConnection()">
-                <i class="fas fa-plug"></i> Test Flussonic Connection
-            </button>
-            <button class="btn" onclick="configureFlussonic()">
-                <i class="fas fa-cog"></i> Configure Stream
-            </button>
-            
-            <div class="flussonic-config">
-                <h4><i class="fas fa-link"></i> Stream URLs</h4>
+        <!-- Stream Access -->
+        <div id="streams" class="tab-content">
+            <div class="card">
+                <h2><i class="fas fa-play-circle"></i> Stream Access</h2>
                 
-                <div class="url-display">
-                    <h4>HLS Stream URL:</h4>
-                    <div id="hlsUrl">http://localhost:8080/live-stream/index.m3u8</div>
-                    <button class="copy-btn" onclick="copyUrl('hlsUrl')">Copy URL</button>
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i>
+                    <strong>OBS Configuration:</strong><br>
+                    <strong>Server:</strong> rtmp://localhost:1935/live<br>
+                    <strong>Stream Key:</strong> stream
                 </div>
-                
-                <div class="url-display">
-                    <h4>DASH Stream URL:</h4>
-                    <div id="dashUrl">http://localhost:8080/live-stream/index.mpd</div>
-                    <button class="copy-btn" onclick="copyUrl('dashUrl')">Copy URL</button>
-                </div>
-                
-                <div class="url-display">
-                    <h4>RTMP Output URL:</h4>
-                    <div id="rtmpOutputUrl">rtmp://localhost:1935/live/live-stream</div>
-                    <button class="copy-btn" onclick="copyUrl('rtmpOutputUrl')">Copy URL</button>
-                </div>
-            </div>
-        </div>
 
-        <!-- System Logs -->
-        <div class="card">
-            <h2><i class="fas fa-terminal"></i> System Logs</h2>
-            <div class="log-container" id="logContainer">
-                <div>[INFO] SCTE-35 Stream Management System initialized</div>
-                <div>[INFO] Ready to receive OBS streams</div>
+                <!-- SCTE-35 Enabled Stream URLs -->
+                <div class="flussonic-config">
+                    <h4><i class="fas fa-link"></i> SCTE-35 Enabled Stream URLs</h4>
+                    
+                    <div class="url-group">
+                        <label>HLS Stream (SCTE-35 Enabled):</label>
+                        <div class="url-display">
+                            <span id="hlsUrl">http://localhost:8000/live/stream/index.m3u8</span>
+                            <button class="btn" onclick="copyUrl('hlsUrl')">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="url-group">
+                        <label>DASH Stream (SCTE-35 Enabled):</label>
+                        <div class="url-display">
+                            <span id="dashUrl">http://localhost:8000/live/stream/index.mpd</span>
+                            <button class="btn" onclick="copyUrl('dashUrl')">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="url-group">
+                        <label>RTMP Output:</label>
+                        <div class="url-display">
+                            <span id="rtmpOutputUrl">rtmp://localhost:1935/live/stream</span>
+                            <button class="btn" onclick="copyUrl('rtmpOutputUrl')">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Stream Player -->
+                <div class="flussonic-config">
+                    <h4><i class="fas fa-video"></i> Stream Player</h4>
+                    <button class="btn btn-primary" onclick="playHLS()">
+                        <i class="fas fa-play"></i> Play HLS Stream
+                    </button>
+                    <button class="btn btn-primary" onclick="playDASH()">
+                        <i class="fas fa-play"></i> Play DASH Stream
+                    </button>
+                </div>
+
+                <!-- System Logs -->
+                <div class="flussonic-config">
+                    <h4><i class="fas fa-terminal"></i> System Logs</h4>
+                    <div class="log-container" id="logContainer" style="height: 200px;">
+                        <div>[INFO] SCTE-35 Stream Management System initialized</div>
+                    </div>
+                    <button class="btn" onclick="clearLogs()">
+                        <i class="fas fa-trash"></i> Clear Logs
+                    </button>
+                </div>
             </div>
-            <button class="btn" onclick="clearLogs()">
-                <i class="fas fa-trash"></i> Clear Logs
-            </button>
         </div>
     </div>
 
