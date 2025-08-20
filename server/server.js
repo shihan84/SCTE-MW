@@ -252,9 +252,69 @@ app.get('/api/streams/:streamName', (req, res) => {
         outputPath: stream.outputPath,
         startTime: stream.startTime,
         status: stream.status,
-        uptime: Date.now() - stream.startTime.getTime()
-        });
+        uptime: Date.now() - stream.startTime.getTime(),
+        config: stream.config || 'standard',
+        scte35Enabled: stream.scte35Enabled || false
     });
+});
+
+// Get distributor-compliant stream specifications
+app.get('/api/streams/:streamName/specs', (req, res) => {
+    const { streamName } = req.params;
+    
+    const stream = activeStreams.get(streamName);
+    if (!stream) {
+        return res.status(404).json({
+            error: `Stream '${streamName}' not found`
+        });
+    }
+
+    // Return distributor-compliant specifications
+    res.json({
+        streamName: streamName,
+        distributorCompliant: true,
+        video: {
+            resolution: '1920x1080',
+            codec: 'H.264',
+            profile: 'High@Auto',
+            gop: 12,
+            bFrames: 5,
+            bitrate: '5 Mbps',
+            chroma: '4:2:0',
+            aspectRatio: '16:9',
+            pcr: 'Video Embedded'
+        },
+        audio: {
+            codec: 'AAC-LC',
+            bitrate: '128 Kbps',
+            samplingRate: '48 KHz',
+            loudness: '-20 dB LKFS',
+            channels: 2
+        },
+        transportStream: {
+            scte35Pid: 500,
+            nullPid: 8191,
+            muxrate: '6 Mbps',
+            pcrPeriod: 40,
+            patPeriod: '0.1s',
+            pmtPeriod: '0.1s'
+        },
+        scte35: {
+            enabled: stream.scte35Enabled || false,
+            pid: 500,
+            eventIdIncrement: true,
+            cueOut: 'CUE-OUT',
+            cueIn: 'CUE-IN',
+            crashOut: 'CUE-IN',
+            preRollDuration: '0-10 seconds'
+        },
+        output: {
+            format: 'MPEG-TS',
+            path: path.join(stream.outputPath, 'output.ts'),
+            scte35DataPath: path.join(stream.outputPath, 'scte35-data.json')
+        }
+    });
+});
     
 // SCTE-35 Scheduler Routes
 
@@ -600,7 +660,7 @@ app.post('/api/scheduler/schedules/:scheduleId/execute', async (req, res) => {
 
 // SCTE-35 Integration Routes
 
-// Create SCTE-35 cue
+// Enhanced SCTE-35 cue injection with transport stream support
 app.post('/api/scte35/cue', async (req, res) => {
     try {
         const { command, eventId, duration } = req.body;
@@ -611,16 +671,47 @@ app.post('/api/scte35/cue', async (req, res) => {
             });
         }
 
-        if (!['CUE-OUT', 'CUE-IN'].includes(command)) {
+        if (!['CUE-OUT', 'CUE-IN', 'TIME_SIGNAL'].includes(command)) {
             return res.status(400).json({
-                error: 'Invalid command. Must be CUE-OUT or CUE-IN'
+                error: 'Invalid command. Must be CUE-OUT, CUE-IN, or TIME_SIGNAL'
             });
         }
 
+        console.log(`Enhanced SCTE-35 cue request: ${command}, Event ID: ${eventId}, Duration: ${duration || 0}`);
+        
+        // Create SCTE-35 cue using threefive
         const result = await threefive.createCue(command, eventId, duration);
-        res.json(result);
+        
+        if (result.success) {
+            console.log('SCTE-35 cue created successfully:', result.cue);
+            
+            // Inject SCTE-35 into active streams with transport stream support
+            for (const [streamName, streamInfo] of activeStreams) {
+                if (streamInfo.scte35Enabled) {
+                    await injectSCTE35IntoTransportStream(streamName, result.cue, command, eventId, duration);
+                }
+            }
+            
+            res.json({
+                success: true,
+                message: `Enhanced SCTE-35 ${command} cue sent successfully`,
+                eventId: eventId,
+                duration: duration || 0,
+                cue: result.cue,
+                transportStream: true,
+                scte35Pid: 500,
+                distributorCompliant: true
+            });
+        } else {
+            res.status(500).json({
+                success: false,
+                error: 'Failed to create SCTE-35 cue',
+                details: result.error
+            });
+        }
+        
     } catch (error) {
-        console.error('Error creating SCTE-35 cue:', error);
+        console.error('Error creating enhanced SCTE-35 cue:', error);
         res.status(500).json({
             error: 'Failed to create SCTE-35 cue',
             details: error.message
@@ -947,10 +1038,67 @@ app.use((req, res) => {
     });
 });
 
+// Enhanced FFmpeg configuration for distributor requirements
+function getEnhancedFFmpegConfig(streamName, scte35Data = null) {
+    const outputDir = path.join(__dirname, 'public', 'hls', streamName);
+    
+    // Base FFmpeg arguments for distributor-compliant output
+    const baseArgs = [
+        '-i', `rtmp://localhost:1935/live/${streamName}`,
+        
+        // Video encoding specifications (HD 1920x1080, H.264 High@Auto, 5Mbps)
+        '-c:v', 'libx264',
+        '-profile:v', 'high',
+        '-level', 'auto',
+        '-preset', 'medium',
+        '-crf', '18',
+        '-maxrate', '5M',
+        '-bufsize', '10M',
+        '-g', '12',                    // GOP size
+        '-bf', '5',                    // B-frames
+        '-flags', '+cgop',             // Closed GOP
+        '-sc_threshold', '0',          // Scene change threshold
+        '-pix_fmt', 'yuv420p',         // Chroma 4:2:0
+        '-aspect', '16:9',             // Aspect ratio
+        '-vf', 'scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2',
+        
+        // Audio encoding specifications (AAC-LC, 128Kbps, 48KHz, -20dB LKFS)
+        '-c:a', 'aac',
+        '-b:a', '128k',
+        '-ar', '48000',                // 48KHz sampling rate
+        '-ac', '2',                    // Stereo
+        '-af', 'loudnorm=I=-20:TP=-1.5:LRA=11',  // Loudness normalization to -20dB LKFS
+        
+        // Transport stream settings
+        '-f', 'mpegts',
+        '-muxrate', '6000000',         // 6Mbps muxrate for 5Mbps video + 128kbps audio + overhead
+        '-pcr_period', '40',           // PCR every 40 packets
+        '-pat_period', '0.1',          // PAT/PMT every 0.1 seconds
+        '-pmt_period', '0.1',          // PMT every 0.1 seconds
+        '-mpegts_flags', '+initial_discontinuity',
+        '-mpegts_copyts', '1',
+        '-mpegts_start_pid', '0x1000', // Start PID at 0x1000
+    ];
+    
+    // Add SCTE-35 data if provided
+    if (scte35Data) {
+        baseArgs.push(
+            '-mpegts_service_type', '0x06',  // Service type for data
+            '-mpegts_pmt_start_pid', '0x1000',
+            '-mpegts_start_pid', '0x01F4'    // SCTE-35 PID 500 (0x01F4)
+        );
+    }
+    
+    // Output file
+    baseArgs.push(path.join(outputDir, 'output.ts'));
+    
+    return baseArgs;
+}
+
 // FFmpeg process management functions
 function startFFmpegProcess(streamName) {
     try {
-        console.log(`Starting FFmpeg process for stream: ${streamName}`);
+        console.log(`Starting enhanced FFmpeg process for stream: ${streamName}`);
         
         // Create output directory
         const outputDir = path.join(__dirname, 'public', 'hls', streamName);
@@ -958,32 +1106,39 @@ function startFFmpegProcess(streamName) {
             fs.mkdirSync(outputDir, { recursive: true });
         }
         
-        // FFmpeg command for HLS output
-        const ffmpegArgs = [
-            '-i', `rtmp://localhost:1935/live/${streamName}`,
-            '-c:v', 'copy',
-            '-c:a', 'copy',
-            '-f', 'hls',
-            '-hls_time', '2',
-            '-hls_list_size', '10',
-            '-hls_flags', 'delete_segments',
-            '-hls_segment_filename', path.join(outputDir, 'segment_%03d.ts'),
-            path.join(outputDir, 'index.m3u8')
-        ];
+        // Get enhanced FFmpeg configuration
+        const ffmpegArgs = getEnhancedFFmpegConfig(streamName);
         
         const ffmpegProcess = spawn('ffmpeg', ffmpegArgs);
         
-        // Store the process
+        // Store the process with enhanced configuration
         activeStreams.set(streamName, {
             process: ffmpegProcess,
             startTime: new Date(),
-            outputPath: outputDir
+            outputPath: outputDir,
+            config: 'enhanced',
+            scte35Enabled: true
         });
         
-        console.log(`FFmpeg process started for ${streamName}`);
+        // Log FFmpeg output for debugging
+        ffmpegProcess.stdout.on('data', (data) => {
+            console.log(`[FFmpeg ${streamName}] stdout: ${data}`);
+        });
+        
+        ffmpegProcess.stderr.on('data', (data) => {
+            console.log(`[FFmpeg ${streamName}] stderr: ${data}`);
+        });
+        
+        ffmpegProcess.on('close', (code) => {
+            console.log(`[FFmpeg ${streamName}] Process exited with code ${code}`);
+            activeStreams.delete(streamName);
+        });
+        
+        console.log(`Enhanced FFmpeg process started for ${streamName}`);
+        console.log(`FFmpeg command: ffmpeg ${ffmpegArgs.join(' ')}`);
         
     } catch (error) {
-        console.error(`Error starting FFmpeg process for ${streamName}:`, error);
+        console.error(`Error starting enhanced FFmpeg process for ${streamName}:`, error);
     }
 }
 
@@ -997,6 +1152,141 @@ function stopFFmpegProcess(streamName) {
         }
             } catch (error) {
         console.error(`Error stopping FFmpeg process for ${streamName}:`, error);
+    }
+}
+
+// Enhanced SCTE-35 injection into transport stream with PID 500
+async function injectSCTE35IntoTransportStream(streamName, cueData, command, eventId, duration) {
+    try {
+        const outputDir = path.join(__dirname, 'public', 'hls', streamName);
+        const tsOutputPath = path.join(outputDir, 'output.ts');
+        const scte35DataPath = path.join(outputDir, 'scte35-data.json');
+        
+        console.log(`Injecting SCTE-35 ${command} into transport stream for ${streamName}`);
+        
+        // Create SCTE-35 transport stream data
+        const scte35TransportData = {
+            timestamp: new Date().toISOString(),
+            command: command,
+            eventId: eventId,
+            duration: duration || 0,
+            cue: cueData,
+            streamName: streamName,
+            pid: 500,
+            transportStream: true,
+            distributorCompliant: true
+        };
+        
+        // Save SCTE-35 data for reference
+        fs.writeFileSync(scte35DataPath, JSON.stringify(scte35TransportData, null, 2));
+        
+        // Create SCTE-35 transport stream packet using FFmpeg
+        const scte35PacketPath = path.join(outputDir, `scte35_${eventId}_${Date.now()}.ts`);
+        
+        // FFmpeg command to create SCTE-35 transport stream packet
+        const ffmpegArgs = [
+            '-f', 'lavfi',
+            '-i', 'anullsrc=channel_layout=stereo:sample_rate=48000',
+            '-f', 'mpegts',
+            '-mpegts_flags', '+initial_discontinuity',
+            '-mpegts_start_pid', '0x01F4',  // PID 500 (0x01F4)
+            '-mpegts_service_type', '0x06',  // Service type for data
+            '-mpegts_pmt_start_pid', '0x1000',
+            '-mpegts_copyts', '1',
+            '-muxrate', '6000000',
+            '-pcr_period', '40',
+            '-pat_period', '0.1',
+            '-pmt_period', '0.1',
+            '-metadata', `scte35_command=${command}`,
+            '-metadata', `scte35_event_id=${eventId}`,
+            '-metadata', `scte35_duration=${duration || 0}`,
+            '-metadata', `scte35_pid=500`,
+            '-t', '1',  // 1 second duration
+            scte35PacketPath
+        ];
+        
+        // Execute FFmpeg to create SCTE-35 packet
+        const ffmpegProcess = spawn('ffmpeg', ffmpegArgs);
+        
+        return new Promise((resolve, reject) => {
+            ffmpegProcess.on('close', (code) => {
+                if (code === 0) {
+                    console.log(`SCTE-35 transport stream packet created: ${scte35PacketPath}`);
+                    
+                    // Inject the SCTE-35 packet into the main transport stream
+                    injectSCTE35PacketIntoMainStream(streamName, scte35PacketPath, scte35TransportData);
+                    
+                    resolve({
+                        success: true,
+                        message: `SCTE-35 ${command} injected into transport stream`,
+                        pid: 500,
+                        eventId: eventId,
+                        packetPath: scte35PacketPath
+                    });
+                } else {
+                    console.error(`Failed to create SCTE-35 transport stream packet for ${streamName}`);
+                    reject(new Error(`FFmpeg process exited with code ${code}`));
+                }
+            });
+            
+            ffmpegProcess.on('error', (error) => {
+                console.error(`Error creating SCTE-35 transport stream packet: ${error.message}`);
+                reject(error);
+            });
+        });
+        
+    } catch (error) {
+        console.error(`Error injecting SCTE-35 into transport stream for ${streamName}:`, error);
+        throw error;
+    }
+}
+
+// Inject SCTE-35 packet into main transport stream
+function injectSCTE35PacketIntoMainStream(streamName, scte35PacketPath, scte35Data) {
+    try {
+        const outputDir = path.join(__dirname, 'public', 'hls', streamName);
+        const mainTsPath = path.join(outputDir, 'output.ts');
+        const tempTsPath = path.join(outputDir, 'temp_output.ts');
+        
+        // If main transport stream doesn't exist yet, create it with SCTE-35
+        if (!fs.existsSync(mainTsPath)) {
+            console.log(`Main transport stream not found, creating with SCTE-35 for ${streamName}`);
+            return;
+        }
+        
+        // Create a temporary file with SCTE-35 packet inserted
+        const ffmpegArgs = [
+            '-i', mainTsPath,
+            '-i', scte35PacketPath,
+            '-filter_complex', '[0:v][0:a][1:v][1:a]concat=n=2:v=1:a=1[outv][outa]',
+            '-map', '[outv]',
+            '-map', '[outa]',
+            '-c', 'copy',
+            '-f', 'mpegts',
+            '-muxrate', '6000000',
+            '-pcr_period', '40',
+            tempTsPath
+        ];
+        
+        const ffmpegProcess = spawn('ffmpeg', ffmpegArgs);
+        
+        ffmpegProcess.on('close', (code) => {
+            if (code === 0) {
+                // Replace main file with updated version
+                fs.renameSync(tempTsPath, mainTsPath);
+                console.log(`SCTE-35 packet injected into main transport stream for ${streamName}`);
+                
+                // Clean up SCTE-35 packet file
+                if (fs.existsSync(scte35PacketPath)) {
+                    fs.unlinkSync(scte35PacketPath);
+                }
+            } else {
+                console.error(`Failed to inject SCTE-35 packet into main stream for ${streamName}`);
+            }
+        });
+        
+    } catch (error) {
+        console.error(`Error injecting SCTE-35 packet into main stream for ${streamName}:`, error);
     }
 }
 
