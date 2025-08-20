@@ -685,9 +685,13 @@ app.post('/api/scte35/cue', async (req, res) => {
         if (result.success) {
             console.log('SCTE-35 cue created successfully:', result.cue);
             
-            // Inject SCTE-35 into active streams with transport stream support
+            // Inject SCTE-35 into active streams (both HLS and transport stream)
             for (const [streamName, streamInfo] of activeStreams) {
                 if (streamInfo.scte35Enabled) {
+                    // Inject into HLS for web interface
+                    injectSCTE35IntoHLS(streamName, result.cue, command, eventId, duration);
+                    
+                    // Inject into transport stream for distributor
                     await injectSCTE35IntoTransportStream(streamName, result.cue, command, eventId, duration);
                 }
             }
@@ -1038,7 +1042,7 @@ app.use((req, res) => {
     });
 });
 
-// Enhanced FFmpeg configuration for distributor requirements
+// Enhanced FFmpeg configuration for distributor requirements with dual output
 function getEnhancedFFmpegConfig(streamName, scte35Data = null) {
     const outputDir = path.join(__dirname, 'public', 'hls', streamName);
     
@@ -1069,28 +1073,10 @@ function getEnhancedFFmpegConfig(streamName, scte35Data = null) {
         '-ac', '2',                    // Stereo
         '-af', 'loudnorm=I=-20:TP=-1.5:LRA=11',  // Loudness normalization to -20dB LKFS
         
-        // Transport stream settings
-        '-f', 'mpegts',
-        '-muxrate', '6000000',         // 6Mbps muxrate for 5Mbps video + 128kbps audio + overhead
-        '-pcr_period', '40',           // PCR every 40 packets
-        '-pat_period', '0.1',          // PAT/PMT every 0.1 seconds
-        '-pmt_period', '0.1',          // PMT every 0.1 seconds
-        '-mpegts_flags', '+initial_discontinuity',
-        '-mpegts_copyts', '1',
-        '-mpegts_start_pid', '0x1000', // Start PID at 0x1000
+        // Dual output: HLS for web interface + Transport Stream for distributor
+        '-f', 'tee',
+        `[f=hls:hls_time=2:hls_list_size=10:hls_flags=delete_segments:hls_segment_filename=${path.join(outputDir, 'segment_%03d.ts')}]${path.join(outputDir, 'index.m3u8')}|[f=mpegts:muxrate=6000000:pcr_period=40:pat_period=0.1:mpegts_flags=+initial_discontinuity:mpegts_copyts=1:mpegts_start_pid=0x1000]${path.join(outputDir, 'output.ts')}`
     ];
-    
-    // Add SCTE-35 data if provided
-    if (scte35Data) {
-        baseArgs.push(
-            '-mpegts_service_type', '0x06',  // Service type for data
-            '-mpegts_pmt_start_pid', '0x1000',
-            '-mpegts_start_pid', '0x01F4'    // SCTE-35 PID 500 (0x01F4)
-        );
-    }
-    
-    // Output file
-    baseArgs.push(path.join(outputDir, 'output.ts'));
     
     return baseArgs;
 }
@@ -1238,6 +1224,58 @@ async function injectSCTE35IntoTransportStream(streamName, cueData, command, eve
     } catch (error) {
         console.error(`Error injecting SCTE-35 into transport stream for ${streamName}:`, error);
         throw error;
+    }
+}
+
+// Inject SCTE-35 into HLS playlist for web interface
+function injectSCTE35IntoHLS(streamName, cueData, command, eventId, duration) {
+    try {
+        const playlistPath = path.join(__dirname, 'public', 'hls', streamName, 'index.m3u8');
+        const dataPath = path.join(__dirname, 'public', 'hls', streamName, 'scte35-data.json');
+        
+        if (!fs.existsSync(playlistPath)) {
+            console.log(`HLS playlist not found for stream: ${streamName}`);
+            return;
+        }
+        
+        // Read current playlist
+        let playlist = fs.readFileSync(playlistPath, 'utf8');
+        
+        // Add SCTE-35 markers to playlist
+        const scte35Marker = `#EXT-X-SCTE35:${command},${eventId},${duration || 0}`;
+        const cueOutMarker = command === 'CUE-OUT' ? `#EXT-X-CUE-OUT:${duration || 0}` : '';
+        const cueInMarker = command === 'CUE-IN' ? '#EXT-X-CUE-IN' : '';
+        
+        // Insert markers before the first segment
+        const lines = playlist.split('\n');
+        const segmentIndex = lines.findIndex(line => line.endsWith('.ts'));
+        
+        if (segmentIndex !== -1) {
+            lines.splice(segmentIndex, 0, scte35Marker);
+            if (cueOutMarker) lines.splice(segmentIndex + 1, 0, cueOutMarker);
+            if (cueInMarker) lines.splice(segmentIndex + 1, 0, cueInMarker);
+        }
+        
+        // Write updated playlist
+        fs.writeFileSync(playlistPath, lines.join('\n'));
+        
+        // Save SCTE-35 data
+        const scte35Data = {
+            timestamp: new Date().toISOString(),
+            command: command,
+            eventId: eventId,
+            duration: duration || 0,
+            cue: cueData,
+            streamName: streamName,
+            output: 'HLS'
+        };
+        
+        fs.writeFileSync(dataPath, JSON.stringify(scte35Data, null, 2));
+        
+        console.log(`SCTE-35 ${command} injected into HLS playlist for ${streamName}`);
+        
+    } catch (error) {
+        console.error(`Error injecting SCTE-35 into HLS for ${streamName}:`, error);
     }
 }
 
@@ -1413,11 +1451,41 @@ function initializeNodeMediaServer() {
     }
 }
 
+// HLS Routes for SCTE-35 enabled streams
+app.get('/live/:streamName/index.m3u8', (req, res) => {
+    const { streamName } = req.params;
+    const playlistPath = path.join(__dirname, 'public', 'hls', streamName, 'index.m3u8');
+    
+    if (!fs.existsSync(playlistPath)) {
+        return res.status(404).json({ error: 'Playlist not found' });
+    }
+    
+    res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('X-SCTE35-Enabled', 'true');
+    res.setHeader('X-SCTE35-PID', '500');
+    res.sendFile(playlistPath);
+});
+
+app.get('/live/:streamName/:segment', (req, res) => {
+    const { streamName, segment } = req.params;
+    const segmentPath = path.join(__dirname, 'public', 'hls', streamName, segment);
+    
+    if (!fs.existsSync(segmentPath)) {
+        return res.status(404).json({ error: 'Segment not found' });
+    }
+    
+    res.setHeader('Content-Type', 'video/mp2t');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.sendFile(segmentPath);
+});
+
 // Start server
 app.listen(PORT, () => {
     console.log(`SCTE-MW Server running on port ${PORT}`);
     console.log(`Health check: http://localhost:${PORT}/api/health`);
     console.log(`Web interface: http://localhost:${PORT}`);
+    console.log(`HLS streams: http://localhost:${PORT}/live/:streamName/index.m3u8`);
     
     // Start NodeMediaServer
     initializeNodeMediaServer();
