@@ -3,6 +3,7 @@ const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
 const { spawn } = require('child_process');
+const NodeMediaServer = require('node-media-server');
 const ThreeFiveIntegration = require('./threefive-integration.js');
 const SCTE35Scheduler = require('./scte35-scheduler.js');
 
@@ -26,6 +27,25 @@ const activeStreams = new Map();
 // Store scheduled SCTE-35 events
 const scheduledEvents = new Map();
 let eventCounter = 1;
+
+// NodeMediaServer configuration
+const nmsConfig = {
+    rtmp: {
+        port: 1935,
+        chunk_size: 60000,
+        gop_cache: true,
+        ping: 30,
+        ping_timeout: 60,
+        maxConnections: 100
+    },
+    http: {
+        port: 8000,
+        allow_origin: '*'
+    }
+};
+
+// Initialize NodeMediaServer
+let nms = null;
 
 // Utility function to check if ffmpeg is available
 function checkFFmpeg() {
@@ -758,13 +778,14 @@ app.post('/api/rtmp/config', (req, res) => {
         
         // Update NodeMediaServer configuration
         if (nms) {
-            nms.config.rtmp.port = rtmpPort;
-            nms.config.http.port = httpPort;
-            nms.config.rtmp.maxConnections = maxConnections;
-            nms.config.rtmp.bufferSize = bufferSize * 1024 * 1024; // Convert MB to bytes
+            // Update the global config
+            nmsConfig.rtmp.port = rtmpPort;
+            nmsConfig.http.port = httpPort;
+            nmsConfig.rtmp.maxConnections = maxConnections;
+            nmsConfig.rtmp.chunk_size = bufferSize * 1024 * 1024; // Convert MB to bytes
+            
+            console.log('RTMP server configuration updated:', req.body);
         }
-        
-        console.log('RTMP server configuration updated:', req.body);
         
         res.json({
             success: true,
@@ -860,9 +881,9 @@ app.get('/api/rtmp/status', (req, res) => {
     try {
         const status = {
             running: nms ? true : false,
-            connections: nms ? nms.sessions.size : 0,
+            connections: nms && nms.sessions ? nms.sessions.size : 0,
             streams: activeStreams.size,
-            uptime: nms ? Date.now() - nms.startTime : 0
+            uptime: nms ? Date.now() - (nms.startTime || Date.now()) : 0
         };
         
         res.json({
@@ -894,11 +915,132 @@ app.use((req, res) => {
     });
 });
 
+// FFmpeg process management functions
+function startFFmpegProcess(streamName) {
+    try {
+        console.log(`Starting FFmpeg process for stream: ${streamName}`);
+        
+        // Create output directory
+        const outputDir = path.join(__dirname, 'public', 'hls', streamName);
+        if (!fs.existsSync(outputDir)) {
+            fs.mkdirSync(outputDir, { recursive: true });
+        }
+        
+        // FFmpeg command for HLS output
+        const ffmpegArgs = [
+            '-i', `rtmp://localhost:1935/live/${streamName}`,
+            '-c:v', 'copy',
+            '-c:a', 'copy',
+            '-f', 'hls',
+            '-hls_time', '2',
+            '-hls_list_size', '10',
+            '-hls_flags', 'delete_segments',
+            '-hls_segment_filename', path.join(outputDir, 'segment_%03d.ts'),
+            path.join(outputDir, 'index.m3u8')
+        ];
+        
+        const ffmpegProcess = spawn('ffmpeg', ffmpegArgs);
+        
+        // Store the process
+        activeStreams.set(streamName, {
+            process: ffmpegProcess,
+            startTime: new Date(),
+            outputPath: outputDir
+        });
+        
+        console.log(`FFmpeg process started for ${streamName}`);
+        
+    } catch (error) {
+        console.error(`Error starting FFmpeg process for ${streamName}:`, error);
+    }
+}
+
+function stopFFmpegProcess(streamName) {
+    try {
+        const stream = activeStreams.get(streamName);
+        if (stream && stream.process) {
+            stream.process.kill('SIGTERM');
+            activeStreams.delete(streamName);
+            console.log(`FFmpeg process stopped for ${streamName}`);
+        }
+    } catch (error) {
+        console.error(`Error stopping FFmpeg process for ${streamName}:`, error);
+    }
+}
+
+// Initialize NodeMediaServer
+function initializeNodeMediaServer() {
+    try {
+        nms = new NodeMediaServer(nmsConfig);
+        
+        // RTMP event handlers
+        nms.on('prePublish', (id, StreamPath, args) => {
+            console.log('[NodeEvent on prePublish]', `id=${id} StreamPath=${StreamPath} args=${JSON.stringify(args)}`);
+            
+            // Extract stream name from StreamPath
+            let streamName = 'live-stream';
+            if (StreamPath) {
+                const parts = StreamPath.split('/');
+                if (parts.length > 1) {
+                    streamName = parts[parts.length - 1];
+                }
+            }
+            
+            console.log(`Stream starting: ${streamName}`);
+        });
+        
+        nms.on('postPublish', (id, StreamPath, args) => {
+            console.log('[NodeEvent on postPublish]', `id=${id} StreamPath=${StreamPath} args=${JSON.stringify(args)}`);
+            
+            // Extract stream name from StreamPath
+            let streamName = 'live-stream';
+            if (StreamPath) {
+                const parts = StreamPath.split('/');
+                if (parts.length > 1) {
+                    streamName = parts[parts.length - 1];
+                }
+            }
+            
+            console.log(`Stream started: ${streamName}`);
+            
+            // Start FFmpeg process for HLS/DASH output
+            startFFmpegProcess(streamName);
+        });
+        
+        nms.on('donePublish', (id, StreamPath, args) => {
+            console.log('[NodeEvent on donePublish]', `id=${id} StreamPath=${StreamPath} args=${JSON.stringify(args)}`);
+            
+            // Extract stream name from StreamPath
+            let streamName = 'live-stream';
+            if (StreamPath) {
+                const parts = StreamPath.split('/');
+                if (parts.length > 1) {
+                    streamName = parts[parts.length - 1];
+                }
+            }
+            
+            console.log(`Stream ended: ${streamName}`);
+            
+            // Stop FFmpeg process
+            stopFFmpegProcess(streamName);
+        });
+        
+        nms.run();
+        console.log('NodeMediaServer started on RTMP port 1935 and HTTP port 8000');
+        
+    } catch (error) {
+        console.error('Error starting NodeMediaServer:', error);
+    }
+}
+
 // Start server
 app.listen(PORT, () => {
     console.log(`SCTE-MW Server running on port ${PORT}`);
     console.log(`Health check: http://localhost:${PORT}/api/health`);
     console.log(`Web interface: http://localhost:${PORT}`);
+    
+    // Start NodeMediaServer
+    initializeNodeMediaServer();
     
     // Start the scheduler
     scheduler.start();
