@@ -270,11 +270,55 @@
                 <!-- Stream Player -->
                 <div class="flussonic-config">
                     <h4><i class="fas fa-video"></i> Stream Player</h4>
+                    
+                    <!-- Built-in Video Player -->
+                    <div class="video-player-container">
+                        <video id="streamPlayer" controls autoplay muted style="width: 100%; max-width: 800px; height: auto; background: #000;">
+                            <source id="hlsSource" src="http://localhost:8000/live/stream/index.m3u8" type="application/x-mpegURL">
+                            Your browser does not support the video tag.
+                        </video>
+                        <div class="player-controls">
+                            <button class="btn btn-primary" onclick="loadHLSStream()">
+                                <i class="fas fa-play"></i> Load HLS Stream
+                            </button>
+                            <button class="btn btn-primary" onclick="loadDASHStream()">
+                                <i class="fas fa-play"></i> Load DASH Stream
+                            </button>
+                            <button class="btn btn-warning" onclick="refreshStream()">
+                                <i class="fas fa-redo"></i> Refresh Stream
+                            </button>
+                            <button class="btn btn-danger" onclick="stopStream()">
+                                <i class="fas fa-stop"></i> Stop Stream
+                            </button>
+                        </div>
+                        <div class="stream-info">
+                            <span id="streamStatus">Stream Status: Loading...</span>
+                            <span id="streamQuality">Quality: Auto</span>
+                        </div>
+                    </div>
+                    
+                    <div class="player-options">
+                        <h5>Player Options:</h5>
+                        <div class="form-group">
+                            <label>Stream URL:</label>
+                            <select id="streamUrlSelect" onchange="changeStreamUrl()">
+                                <option value="http://localhost:8000/live/stream/index.m3u8">HLS Stream (Default)</option>
+                                <option value="http://localhost:8000/live/stream/index.mpd">DASH Stream</option>
+                                <option value="custom">Custom URL</option>
+                            </select>
+                        </div>
+                        <div class="form-group" id="customUrlGroup" style="display: none;">
+                            <label>Custom Stream URL:</label>
+                            <input type="text" id="customStreamUrl" placeholder="Enter custom stream URL">
+                            <button class="btn" onclick="loadCustomStream()">Load Custom Stream</button>
+                        </div>
+                    </div>
+                    
                     <button class="btn btn-primary" onclick="playHLS()">
-                        <i class="fas fa-play"></i> Play HLS Stream
+                        <i class="fas fa-external-link-alt"></i> Open HLS in New Tab
                     </button>
                     <button class="btn btn-primary" onclick="playDASH()">
-                        <i class="fas fa-play"></i> Play DASH Stream
+                        <i class="fas fa-external-link-alt"></i> Open DASH in New Tab
                     </button>
                 </div>
 
